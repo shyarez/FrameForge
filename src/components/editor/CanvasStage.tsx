@@ -2,14 +2,57 @@
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { evaluateProject } from "@/lib/engine/evaluate";
-import { CANVAS_SIZES, type SceneElement } from "@/lib/schema/project";
-import { SceneView } from "@/components/render/SceneView";
+import { snapMove, type Guide } from "@/lib/engine/snap";
+import { CANVAS_SIZES, type SceneElement, type TextElement } from "@/lib/schema/project";
+import { FONT_STACKS, SceneView } from "@/components/render/SceneView";
 import { findElement, findScene, useEditor } from "@/store/editor";
 
 type Handle = "nw" | "ne" | "sw" | "se";
 type Drag =
   | { kind: "move"; id: string; startX: number; startY: number; orig: { x: number; y: number } }
   | { kind: "resize"; id: string; handle: Handle; startX: number; startY: number; orig: { x: number; y: number; width: number; height: number } };
+
+/** On-canvas text editor: a textarea laid exactly over the text element, in canvas units. */
+function InlineTextEditor({ el, onDone }: { el: TextElement; onDone: (text: string | null) => void }) {
+  const done = useRef(false);
+  const finish = (text: string | null) => {
+    if (done.current) return;
+    done.current = true;
+    onDone(text);
+  };
+  return (
+    <textarea
+      aria-label="Edit text"
+      autoFocus
+      defaultValue={el.text}
+      onFocus={(e) => e.currentTarget.select()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onBlur={(e) => finish(e.currentTarget.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") finish(null);
+        else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) finish(e.currentTarget.value);
+      }}
+      className="absolute resize-none overflow-hidden border-0 bg-transparent p-0 outline-none"
+      style={{
+        left: el.x,
+        top: el.y,
+        width: el.width,
+        height: el.height,
+        transform: `rotate(${el.rotation}deg)`,
+        color: el.color,
+        fontSize: el.fontSize,
+        fontWeight: el.fontWeight,
+        fontFamily: FONT_STACKS[el.fontFamily],
+        textAlign: el.align,
+        lineHeight: el.lineHeight,
+        whiteSpace: "pre-wrap",
+        overflowWrap: "break-word",
+        caretColor: "#ffd166",
+        boxShadow: "0 0 0 4px #ff77a8",
+      }}
+    />
+  );
+}
 
 /** Point-in-rect that accounts for the element's rotation about its centre. */
 function hits(el: SceneElement, px: number, py: number) {
@@ -34,6 +77,8 @@ export function CanvasStage() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 800, h: 450 });
   const drag = useRef<Drag | null>(null);
+  const [guides, setGuides] = useState<Guide[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -48,16 +93,21 @@ export function CanvasStage() {
   const state = useMemo(() => evaluateProject(project, timeMs), [project, timeMs]);
   const scene = findScene(project, selectedSceneId);
   const selected = !playing ? findElement(project, selectedElementId)?.element : undefined;
+  const editing = !playing && editingId ? findElement(project, editingId)?.element : undefined;
 
   const toLogical = (e: { clientX: number; clientY: number }, stage: HTMLElement) => {
     const r = stage.getBoundingClientRect();
     return { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale };
   };
 
+  const hitAt = (e: { clientX: number; clientY: number }, stage: HTMLElement) => {
+    const p = toLogical(e, stage);
+    return { p, hit: scene ? [...scene.elements].reverse().find((el) => hits(el, p.x, p.y)) : undefined };
+  };
+
   const onStageDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (playing || !scene || e.button !== 0) return;
-    const p = toLogical(e, e.currentTarget);
-    const hit = [...scene.elements].reverse().find((el) => hits(el, p.x, p.y));
+    const { p, hit } = hitAt(e, e.currentTarget);
     selectElement(hit?.id ?? null);
     if (!hit) return;
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -85,8 +135,13 @@ export function CanvasStage() {
       const el = findElement(draft, d.id)?.element;
       if (!el) return;
       if (d.kind === "move") {
-        el.x = d.orig.x + dx;
-        el.y = d.orig.y + dy;
+        const raw = { x: d.orig.x + dx, y: d.orig.y + dy, width: el.width, height: el.height };
+        // Alt temporarily disables snapping; the threshold is ~8 screen pixels at any zoom.
+        const others = e.altKey ? [] : (scene?.elements ?? []).filter((o) => o.id !== d.id);
+        const snapped = e.altKey ? { ...raw, guides: [] } : snapMove(raw, others, logical, 8 / scale);
+        el.x = snapped.x;
+        el.y = snapped.y;
+        setGuides(snapped.guides);
         return;
       }
       const o = d.orig;
@@ -109,6 +164,22 @@ export function CanvasStage() {
   const onUp = () => {
     if (drag.current) endGesture();
     drag.current = null;
+    setGuides([]);
+  };
+
+  const onDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (playing) return;
+    const { hit } = hitAt(e, e.currentTarget);
+    if (hit?.type === "text") {
+      selectElement(hit.id);
+      setEditingId(hit.id);
+    }
+  };
+
+  const finishEditing = (text: string | null) => {
+    const el = editing;
+    setEditingId(null);
+    if (el?.type === "text" && text !== null && text !== el.text) useEditor.getState().updateElement(el.id, { text });
   };
 
   const hs = 12 / scale; // handle size in logical px so it stays constant on screen
@@ -129,8 +200,14 @@ export function CanvasStage() {
           onPointerMove={onMove}
           onPointerUp={onUp}
           onPointerCancel={onUp}
+          onDoubleClick={onDoubleClick}
         >
-          <SceneView state={state} width={logical.width} height={logical.height} projectId={project.id} />
+          <SceneView state={state} width={logical.width} height={logical.height} projectId={project.id} hideElementId={editing?.id} />
+          {guides.map((g, i) => (
+            <div key={i} aria-hidden className="pointer-events-none absolute bg-coral"
+              style={g.axis === "x" ? { left: g.pos - 1 / scale, top: 0, width: 2 / scale, height: logical.height } : { top: g.pos - 1 / scale, left: 0, height: 2 / scale, width: logical.width }} />
+          ))}
+          {editing?.type === "text" && <InlineTextEditor key={editing.id} el={editing} onDone={finishEditing} />}
           {selected && (
             <div
               className="pointer-events-none absolute"
@@ -165,6 +242,11 @@ export function CanvasStage() {
           )}
         </div>
       </div>
+      {selected && !editing && (
+        <p className="pointer-events-none absolute inset-x-0 bottom-2 text-center text-[11px] text-mute">
+          Drag to move · Shift keeps ratio · Alt disables snapping{selected.type === "text" ? " · Double-click to edit text" : ""}
+        </p>
+      )}
       {scene && scene.elements.length === 0 && !playing && (
         <div className="pointer-events-none absolute inset-x-0 bottom-6 text-center font-display text-[15px] text-mute">
           This scene is empty — add text, shapes or a chart from the left panel.

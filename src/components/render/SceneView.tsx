@@ -74,9 +74,9 @@ function ElementBody({ el, reveal, projectId }: { el: SceneElement; reveal: numb
   }
 }
 
-function ElementNode({ s, projectId }: { s: ElementVisualState; projectId: string }) {
+function ElementNode({ s, projectId, hidden }: { s: ElementVisualState; projectId: string; hidden?: boolean }) {
   const el = s.element;
-  if (!s.visible) return null;
+  if (!s.visible || hidden) return null;
   const style: CSSProperties = {
     position: "absolute",
     left: el.x,
@@ -94,7 +94,7 @@ function ElementNode({ s, projectId }: { s: ElementVisualState; projectId: strin
   );
 }
 
-function Layer({ layer, width, height, projectId }: { layer: SceneLayer; width: number; height: number; projectId: string }) {
+function Layer({ layer, width, height, projectId, hideElementId }: { layer: SceneLayer; width: number; height: number; projectId: string; hideElementId?: string }) {
   return (
     <div
       style={{
@@ -109,7 +109,7 @@ function Layer({ layer, width, height, projectId }: { layer: SceneLayer; width: 
       }}
     >
       {layer.state.elements.map((s) => (
-        <ElementNode key={s.element.id} s={s} projectId={projectId} />
+        <ElementNode key={s.element.id} s={s} projectId={projectId} hidden={s.element.id === hideElementId} />
       ))}
     </div>
   );
@@ -120,16 +120,19 @@ export function SceneView({
   width,
   height,
   projectId,
+  hideElementId,
 }: {
   state: ProjectVisualState;
   width: number;
   height: number;
   projectId: string;
+  /** Editor only: hide one element (e.g. while it is being edited in place). */
+  hideElementId?: string;
 }) {
   return (
     <div style={{ position: "relative", width, height, overflow: "hidden", background: "#000" }}>
       {state.layers.map((layer, i) => (
-        <Layer key={`${layer.state.scene.id}-${i}`} layer={layer} width={width} height={height} projectId={projectId} />
+        <Layer key={`${layer.state.scene.id}-${i}`} layer={layer} width={width} height={height} projectId={projectId} hideElementId={hideElementId} />
       ))}
     </div>
   );

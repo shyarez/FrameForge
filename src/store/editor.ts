@@ -1,8 +1,9 @@
 "use client";
 
 import { create } from "zustand";
-import { createElement, createScene } from "@/lib/schema/factory";
+import { createElement, createScene, newId } from "@/lib/schema/factory";
 import { sceneRestTime, sceneStartTimes } from "@/lib/engine/evaluate";
+import type { AssetInfo } from "@/lib/server/assets";
 import { projectDurationMs, type AspectRatio, type ElementType, type Project, type Scene, type SceneElement } from "@/lib/schema/project";
 
 /**
@@ -26,6 +27,9 @@ interface EditorState {
   playing: boolean;
   saveState: SaveState;
   saveError?: string;
+  /** Uploaded images for this project (not part of the document or its undo history). */
+  assets: AssetInfo[];
+  setAssets(assets: AssetInfo[]): void;
 
   load(project: Project): void;
   commit(mutate: (draft: Project) => void): void;
@@ -52,6 +56,11 @@ interface EditorState {
   updateElement(id: string, patch: Partial<SceneElement>): void;
   deleteElement(id: string): void;
   reorderElement(id: string, dir: "forward" | "backward"): void;
+  /** Copy of an element held for paste; not part of the document or history. */
+  clipboard: SceneElement | null;
+  duplicateElement(id: string): void;
+  copyElement(id: string): void;
+  pasteElement(): void;
 }
 
 const clone = <T,>(v: T): T => structuredClone(v);
@@ -85,6 +94,15 @@ export const useEditor = create<EditorState>()((set, get) => {
     return sceneStartTimes(p)[idx] + sceneRestTime(p.scenes[idx]);
   };
 
+  /**
+   * Move the playhead to the selected scene’s rest pose. Called after edits that add elements or change
+   * their animation, so a new element is never invisible because the playhead sits before its entrance.
+   */
+  const seekRest = () => {
+    const { project, selectedSceneId, playing } = get();
+    if (project && selectedSceneId && !playing) set({ timeMs: seekToScene(project, selectedSceneId) });
+  };
+
   return {
     project: null,
     past: [],
@@ -95,6 +113,12 @@ export const useEditor = create<EditorState>()((set, get) => {
     timeMs: 0,
     playing: false,
     saveState: "saved",
+    assets: [],
+    clipboard: null,
+
+    setAssets(assets) {
+      set({ assets });
+    },
 
     load(project) {
       const first = project.scenes[0];
@@ -238,18 +262,46 @@ export const useEditor = create<EditorState>()((set, get) => {
       const el = { ...createElement(type, project.aspectRatio), ...overrides } as SceneElement;
       commit((d) => findScene(d, selectedSceneId)?.elements.push(el));
       set({ selectedElementId: el.id, playing: false });
+      seekRest();
     },
     updateElement(id, patch) {
       commit((d) => {
         const hit = findElement(d, id);
         if (hit) Object.assign(hit.element, patch);
       });
+      if ("enter" in patch || "exit" in patch) seekRest();
     },
     deleteElement(id) {
       commit((d) => {
         for (const s of d.scenes) s.elements = s.elements.filter((e) => e.id !== id);
       });
       if (get().selectedElementId === id) set({ selectedElementId: null });
+    },
+    duplicateElement(id) {
+      const p = get().project;
+      const hit = p && findElement(p, id);
+      if (!hit) return;
+      const copy = { ...clone(hit.element), id: newId("el"), name: `${hit.element.name} copy`, x: hit.element.x + 40, y: hit.element.y + 40 };
+      commit((d) => {
+        const sc = findScene(d, hit.scene.id)!;
+        sc.elements.splice(sc.elements.findIndex((e) => e.id === id) + 1, 0, copy);
+      });
+      set({ selectedElementId: copy.id });
+      seekRest();
+    },
+    copyElement(id) {
+      const p = get().project;
+      const hit = p && findElement(p, id);
+      if (hit) set({ clipboard: clone(hit.element) });
+    },
+    pasteElement() {
+      const { clipboard, selectedSceneId } = get();
+      if (!clipboard || !selectedSceneId) return;
+      const el = { ...clone(clipboard), id: newId("el"), x: clipboard.x + 40, y: clipboard.y + 40 };
+      commit((d) => findScene(d, selectedSceneId)?.elements.push(el));
+      // Next paste cascades further rather than stacking exactly on top.
+      set({ selectedElementId: el.id, clipboard: { ...clipboard, x: el.x, y: el.y } });
+      seekRest();
     },
     reorderElement(id, dir) {
       commit((d) => {

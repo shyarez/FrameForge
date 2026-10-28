@@ -1,6 +1,7 @@
 import type { Project } from "@/lib/schema/project";
 import type { ProjectSummary } from "@/lib/server/storage";
 import type { ExportJob } from "@/lib/server/exportJobs";
+import type { AssetInfo } from "@/lib/server/assets";
 
 async function json<T>(res: Response): Promise<T> {
   const body = await res.json().catch(() => ({}));
@@ -22,5 +23,14 @@ export const api = {
   deleteProject: (id: string) => fetch(`/api/projects/${encodeURIComponent(id)}`, { method: "DELETE" }).then((r) => json<{ ok: true }>(r)),
   startExport: (id: string) => fetch(`/api/projects/${encodeURIComponent(id)}/export`, { method: "POST" }).then((r) => json<{ job: ExportJob }>(r)),
   getExport: (jobId: string) => fetch(`/api/exports/${encodeURIComponent(jobId)}`, { cache: "no-store" }).then((r) => json<{ job: ExportJob }>(r)),
+  listAssets: (projectId: string) =>
+    fetch(`/api/projects/${encodeURIComponent(projectId)}/assets`, { cache: "no-store" }).then((r) => json<{ assets: AssetInfo[] }>(r)),
+  uploadAsset: (projectId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return fetch(`/api/projects/${encodeURIComponent(projectId)}/assets`, { method: "POST", body: form }).then((r) => json<{ asset: AssetInfo }>(r));
+  },
+  deleteAsset: (projectId: string, name: string) =>
+    fetch(`/api/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(name)}`, { method: "DELETE" }).then((r) => json<{ ok: true }>(r)),
   exportFileUrl: (jobId: string, download = false) => `/api/exports/${encodeURIComponent(jobId)}/file${download ? "?download=1" : ""}`,
 };

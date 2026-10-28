@@ -1,13 +1,14 @@
 "use client";
 
-import { BarChart3, Circle, Heading1, LineChart, PieChart, Shapes, Square, Type } from "lucide-react";
+import { BarChart3, Circle, Heading1, Image as ImageIcon, LineChart, PieChart, Shapes, Square, Type } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { PALETTE } from "@/lib/schema/factory";
 import { Sprite } from "@/components/pixel/Sprite";
 import { ArcadeLabel, cx } from "@/components/ui/primitives";
 import { useEditor } from "@/store/editor";
+import { AssetsTab } from "./AssetsTab";
 
-type Tab = "elements" | "charts";
+type Tab = "elements" | "assets" | "charts";
 
 function Tile({ icon, label, hint, onClick, tint }: { icon: ReactNode; label: string; hint: string; onClick: () => void; tint: string }) {
   return (
@@ -31,11 +32,12 @@ export function LeftPanel() {
   const addElement = useEditor((s) => s.addElement);
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r-[3px] border-line bg-night">
+    <aside className="flex w-72 shrink-0 flex-col border-r-[3px] border-line bg-night">
       <div role="tablist" className="flex gap-2 border-b-2 border-line p-2.5">
         {(
           [
             ["elements", "Elements", <Shapes key="i" className="size-4" />],
+            ["assets", "Assets", <ImageIcon key="i" className="size-4" />],
             ["charts", "Charts", <BarChart3 key="i" className="size-4" />],
           ] as const
         ).map(([id, label, icon]) => (
@@ -45,7 +47,7 @@ export function LeftPanel() {
             aria-selected={tab === id}
             onClick={() => setTab(id)}
             className={cx(
-              "flex flex-1 items-center justify-center gap-1.5 py-2 font-display text-sm font-semibold transition-colors",
+              "flex flex-1 items-center justify-center gap-1 py-2 font-display text-[13px] font-semibold transition-colors",
               tab === id ? "px-box-flat bg-raised text-yellow-ink [--px-c:var(--color-yellow)]" : "text-mute hover:text-paper",
             )}
           >
@@ -73,6 +75,7 @@ export function LeftPanel() {
             </div>
           </>
         )}
+        {tab === "assets" && <AssetsTab />}
         {tab === "charts" && (
           <div className="flex flex-col gap-3">
             <ArcadeLabel className="mb-0.5 block text-mute">Add a chart</ArcadeLabel>

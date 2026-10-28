@@ -30,7 +30,12 @@ export function EditorApp({ projectId }: { projectId: string }) {
     let cancelled = false;
     api
       .getProject(projectId)
-      .then(({ project }) => !cancelled && useEditor.getState().load(project))
+      .then(({ project }) => {
+        if (cancelled) return;
+        useEditor.getState().load(project);
+        useEditor.getState().setAssets([]);
+        api.listAssets(projectId).then(({ assets }) => !cancelled && useEditor.getState().setAssets(assets)).catch(() => undefined);
+      })
       .catch((e) => !cancelled && setLoadError(e.message));
     return () => {
       cancelled = true;
@@ -112,6 +117,14 @@ export function EditorApp({ projectId }: { projectId: string }) {
         e.preventDefault();
         if (e.shiftKey) s.redo();
         else s.undo();
+      } else if (mod && e.key.toLowerCase() === "d" && s.selectedElementId) {
+        e.preventDefault();
+        s.duplicateElement(s.selectedElementId);
+      } else if (mod && e.key.toLowerCase() === "c" && s.selectedElementId) {
+        s.copyElement(s.selectedElementId);
+      } else if (mod && e.key.toLowerCase() === "v" && s.clipboard) {
+        e.preventDefault();
+        s.pasteElement();
       } else if (mod && e.key.toLowerCase() === "y") {
         e.preventDefault();
         s.redo();

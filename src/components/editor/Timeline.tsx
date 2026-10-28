@@ -79,10 +79,37 @@ export function Timeline() {
   const selectedSceneId = useEditor((s) => s.selectedSceneId);
   const { selectScene, addScene, duplicateScene, deleteScene, moveScene, setTime, setPlaying } = useEditor.getState();
   const trackRef = useRef<HTMLDivElement>(null);
+  const pxPerMs = 0.045;
+  const resize = useRef<{ id: string; startX: number; orig: number } | null>(null);
+  const { beginGesture, updateTransient, endGesture } = useEditor.getState();
+
+  /** Drag the right edge of a scene card to change its duration (snaps to 100 ms, one undo step). */
+  const resizeHandlers = (scene: { id: string; durationMs: number }) => ({
+    onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      beginGesture();
+      resize.current = { id: scene.id, startX: e.clientX, orig: scene.durationMs };
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
+      const r = resize.current;
+      if (!r) return;
+      const ms = Math.min(120_000, Math.max(500, Math.round((r.orig + (e.clientX - r.startX) / pxPerMs) / 100) * 100));
+      updateTransient((d) => {
+        const sc = d.scenes.find((x) => x.id === r.id);
+        if (sc) sc.durationMs = ms;
+      });
+    },
+    onPointerUp: () => {
+      if (resize.current) endGesture();
+      resize.current = null;
+    },
+    onClick: (e: React.MouseEvent) => e.stopPropagation(),
+  });
 
   const total = projectDurationMs(project);
   const starts = sceneStartTimes(project);
-  const pxPerMs = 0.045;
   const selIdx = project.scenes.findIndex((s) => s.id === selectedSceneId);
 
   return (
@@ -141,6 +168,8 @@ export function Timeline() {
                 <span className="shrink-0 font-mono text-mute">{(scene.durationMs / 1000).toFixed(1)}s</span>
               </div>
               <SceneThumb project={project} scene={scene} />
+              <div aria-hidden title="Drag to change duration" {...resizeHandlers(scene)}
+                className="absolute top-0 right-0 bottom-0 w-2 cursor-ew-resize bg-transparent hover:bg-aqua/50 active:bg-aqua" />
               {scene.transition.type !== "none" && i > 0 && (
                 <span className="absolute top-0 left-0 h-1 bg-aqua/70" style={{ width: scene.transition.durationMs * pxPerMs }} title={`${scene.transition.type} transition`} />
               )}

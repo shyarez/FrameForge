@@ -1,12 +1,13 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, BarChart3, Copy, Image as ImageIcon, Shapes, Trash2, Type } from "lucide-react";
 import { useDraft } from "@/lib/client/useDraft";
 import {
   AnimationPresetSchema,
   EasingSchema,
   type Animation,
   type ChartElement,
+  type ImageElement,
   type Scene,
   type SceneElement,
 } from "@/lib/schema/project";
@@ -116,8 +117,35 @@ function ChartDataEditor({ el, update }: { el: ChartElement; update: (p: Partial
   );
 }
 
+function ImageFields({ el, update, styleUpdate }: { el: ImageElement; update: (p: Partial<SceneElement>) => void; styleUpdate: (p: Partial<SceneElement>) => void }) {
+  const assets = useEditor((s) => s.assets);
+  const known = assets.some((a) => a.ref === el.src);
+  return (
+    <Section title="Image">
+      <Field label="Source" className="col-span-2">
+        <Select value={known ? el.src : ""} onChange={(e) => e.target.value && update({ src: e.target.value } as Partial<ImageElement>)}>
+          {!known && <option value="">{el.src ? "Missing image" : "Choose an image…"}</option>}
+          {assets.map((a, i) => (
+            <option key={a.name} value={a.ref}>
+              Image {i + 1} ({a.kind.toUpperCase()}, {Math.max(1, Math.round(a.bytes / 1024))} KB)
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Fit">
+        <Select value={el.fit} onChange={(e) => styleUpdate({ fit: e.target.value as ImageElement["fit"] } as Partial<ImageElement>)}>
+          <option value="cover">Cover</option>
+          <option value="contain">Contain</option>
+        </Select>
+      </Field>
+      <NumberField label="Corner radius" value={el.radius} min={0} onCommit={(v) => styleUpdate({ radius: v } as Partial<ImageElement>)} />
+      {assets.length === 0 && <p className="col-span-2 text-[11px] text-mute">Upload images in the Assets tab on the left.</p>}
+    </Section>
+  );
+}
+
 function ElementInspector({ el }: { el: SceneElement }) {
-  const { updateElement, deleteElement, reorderElement } = useEditor.getState();
+  const { updateElement, deleteElement, reorderElement, duplicateElement } = useEditor.getState();
   const update = (patch: Partial<SceneElement>) => updateElement(el.id, patch);
   const styleUpdate = (patch: Partial<SceneElement>) => updateElement(el.id, { ...patch, styleLocked: true } as Partial<SceneElement>);
 
@@ -127,6 +155,7 @@ function ElementInspector({ el }: { el: SceneElement }) {
         <CommitText aria-label="Element name" value={el.name} onCommit={(name) => update({ name })} className="flex-1 font-medium" />
         <IconButton label="Bring forward" onClick={() => reorderElement(el.id, "forward")}><ArrowUp className="size-4" /></IconButton>
         <IconButton label="Send backward" onClick={() => reorderElement(el.id, "backward")}><ArrowDown className="size-4" /></IconButton>
+        <IconButton label="Duplicate element (Ctrl+D)" onClick={() => duplicateElement(el.id)}><Copy className="size-4" /></IconButton>
         <IconButton label="Delete element" onClick={() => deleteElement(el.id)} className="hover:text-coral-ink"><Trash2 className="size-4" /></IconButton>
       </div>
 
@@ -176,6 +205,8 @@ function ElementInspector({ el }: { el: SceneElement }) {
         </Section>
       )}
 
+      {el.type === "image" && <ImageFields el={el} update={update} styleUpdate={styleUpdate} />}
+
       {el.type === "chart" && (
         <Section title="Chart">
           <Field label="Type">
@@ -217,6 +248,43 @@ function ElementInspector({ el }: { el: SceneElement }) {
   );
 }
 
+const LAYER_ICON = { text: Type, shape: Shapes, image: ImageIcon, chart: BarChart3 } as const;
+
+/** Elements of the scene, topmost first. Lets you select elements that are hidden or covered on the canvas. */
+function LayersList({ scene }: { scene: Scene }) {
+  const selectElement = useEditor((s) => s.selectElement);
+  const ordered = [...scene.elements].reverse();
+  return (
+    <section className="px-4 py-4">
+      <h3 className="mb-3 flex items-center gap-2 font-display text-[15px] font-semibold text-aqua-ink">
+        <span aria-hidden className="size-2 bg-aqua" />
+        Layers
+        <span className="ml-auto font-mono text-[11px] font-normal text-mute">{scene.elements.length}</span>
+      </h3>
+      {ordered.length === 0 ? (
+        <p className="text-xs leading-relaxed text-mute">No elements yet. Add one from the left panel.</p>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {ordered.map((el) => {
+            const Icon = LAYER_ICON[el.type];
+            return (
+              <li key={el.id}>
+                <button type="button" onClick={() => selectElement(el.id)}
+                  className="px-box-flat flex w-full items-center gap-2 bg-ink px-2 py-1.5 text-left text-sm hover:[--px-c:var(--color-aqua)]">
+                  <Icon className="size-3.5 shrink-0 text-mute" />
+                  <span className="truncate">{el.name}</span>
+                  {el.enter.preset !== "none" && <span className="ml-auto shrink-0 font-arcade text-[8px] text-mute uppercase">{el.enter.preset}</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <p className="mt-3 text-[11px] leading-relaxed text-mute">Click a layer or an element on the canvas to edit it.</p>
+    </section>
+  );
+}
+
 function SceneInspector({ scene, isFirst }: { scene: Scene; isFirst: boolean }) {
   const updateScene = useEditor((s) => s.updateScene);
   const update = (patch: Partial<Scene>) => updateScene(scene.id, patch);
@@ -241,7 +309,7 @@ function SceneInspector({ scene, isFirst }: { scene: Scene; isFirst: boolean }) 
         <NumberField label="Duration (ms)" value={scene.transition.durationMs} min={0} max={5000} step={100} onCommit={(v) => update({ transition: { ...scene.transition, durationMs: v } })} />
         {isFirst && <p className="col-span-2 text-[11px] text-mute">The first scene has no incoming transition.</p>}
       </Section>
-      <p className="px-4 py-3 text-xs leading-relaxed text-mute">Select an element on the canvas to edit its properties and animation.</p>
+      <LayersList scene={scene} />
     </>
   );
 }

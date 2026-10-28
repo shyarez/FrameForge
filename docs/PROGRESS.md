@@ -60,3 +60,23 @@ Env overrides: `FF_CHROME_PATH`, `FF_FFMPEG_PATH`, `FF_DATA_DIR`.
 - **Light/dark theme** for the whole app (`src/components/theme/`). It defaults to the system preference, a toggle in the dashboard nav and editor top bar overrides it, and the choice persists in localStorage. An inline boot script sets `data-theme` before first paint, so there is no flash. Colours are role tokens (`*-ink` accent text, `onaccent`, `edge`, `shadow`, `grid`), so both themes share all components.
 - **Contrast is tested**: `tests/unit/themeContrast.test.ts` parses both theme blocks from `globals.css` and asserts WCAG AA (≥ 4.5:1) for 16 text/background pairs per theme.
 - **Time-of-day ocean** (dashboard hero only, always in dark scope): `oceanPhases.ts` defines dawn / day / sunset / night palettes keyframed by local hour and blends every colour between neighbouring phases. Night adds jellyfish halos, glowing plankton and moonlight on the surface; rays fade out. A hero button cycles Auto → Dawn → Day → Sunset → Night for demos, with CSS colour transitions. The editor workspace deliberately does not change with time.
+
+## Day 2 — status: done
+
+| Feature | Verified by |
+|---|---|
+| Image upload API (`/api/projects/[id]/assets`): type detected from magic bytes (PNG/JPEG/GIF/WebP), SVG rejected, 8 MB limit, server-generated names, path-safe | unit (`assets.test.ts`) + e2e (fake `.png` rejected) |
+| Assets tab: click/drag-drop upload, thumbnails, add to scene at the image's true aspect ratio, delete (warns if in use) | e2e |
+| Image inspector: swap source, fit (cover/contain), corner radius | manual + screenshot |
+| Uploaded images render in exported MP4 | e2e samples the last video frame and finds the image's magenta pixels |
+| Inline text editing (double-click; Ctrl+Enter or blur commits, Esc cancels) | e2e |
+| Snapping to canvas edges/centre and other elements, with guides; Alt disables | unit (`snap.test.ts`) + e2e |
+| Duplicate (Ctrl+D / button), copy/paste (Ctrl+C/V) with fresh ids | unit (`editorStore.test.ts`) + e2e |
+| Layers list in scene inspector | manual + screenshot |
+| Drag a scene's right edge to change duration (100 ms steps, one undo step) | e2e (4.0 s → 5.0 s) |
+
+**Bug found and fixed:** on a blank scene the playhead sat at 0 ms, so newly added elements were selected but invisible (before their entrance animation). Adding, pasting, duplicating or re-animating an element now moves the playhead to the scene's rest pose. A regression test covers it.
+
+Totals: 80 unit tests, 13 browser e2e tests (Day 1 + Day 2), typecheck and lint clean.
+
+**Next (Day 3):** CSV import and preview, column typing and missing values, deterministic statistics, animated chart scenes, editable story generation.
