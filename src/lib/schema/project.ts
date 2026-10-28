@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CalcResultSchema, CalcSpecSchema } from "@/lib/data/stats";
 
 /**
  * FrameForge scene document, version 1.
@@ -58,6 +59,26 @@ const ElementBase = z.object({
   styleLocked: z.boolean().optional(),
 });
 
+export const NumberFormatSchema = z.enum(["integer", "decimal", "compact", "percent", "signedPercent"]);
+
+/**
+ * Data binding for generated text. {0}, {1}… in the template are replaced with evidence values.
+ * values/formats/units cache the resolved evidence so rendering (and count-up) stays a pure function
+ * of the element; the evidence registry remains the source of truth and refreshes them on updates.
+ */
+export const TextBindingSchema = z.object({
+  template: z.string().max(2000),
+  evidence: z.array(z.string()).max(10),
+  values: z.array(z.number()).max(10),
+  formats: z.array(NumberFormatSchema).max(10),
+  units: z.array(z.string().nullable()).max(10),
+  /** String facts per evidence item for {i:key} tokens, e.g. { label: "North" } or { from: "2024-01", to: "2024-06" }. */
+  strings: z.array(z.record(z.string(), z.string())).max(10),
+  /** Animate the numbers counting up during the entrance animation. */
+  countUp: z.boolean(),
+});
+export type TextBinding = z.infer<typeof TextBindingSchema>;
+
 export const TextElementSchema = ElementBase.extend({
   type: z.literal("text"),
   text: z.string().max(5000),
@@ -67,6 +88,7 @@ export const TextElementSchema = ElementBase.extend({
   color: Color,
   align: z.enum(["left", "center", "right"]),
   lineHeight: z.number().min(0.5).max(4),
+  binding: TextBindingSchema.optional(),
 });
 
 export const ShapeElementSchema = ElementBase.extend({
@@ -95,6 +117,8 @@ export const ChartElementSchema = ElementBase.extend({
   colors: z.array(Color).min(1),
   textColor: Color,
   showValues: z.boolean(),
+  /** Chart data comes from this evidence record (a series calculation). */
+  binding: z.object({ evidenceId: z.string() }).optional(),
 });
 
 export const ElementSchema = z.discriminatedUnion("type", [
@@ -124,6 +148,13 @@ export const SceneSchema = z.object({
   /** Transition played when entering this scene from the previous one. */
   transition: TransitionSchema,
   elements: z.array(ElementSchema).max(300),
+  /** Present on scenes produced by the data-story generator. */
+  generated: z
+    .object({
+      datasetId: z.string(),
+      kind: z.enum(["intro", "metric", "comparison", "trend", "distribution", "summary"]),
+    })
+    .optional(),
 });
 export type Scene = z.infer<typeof SceneSchema>;
 
@@ -134,19 +165,38 @@ export const ExportSettingsSchema = z.object({
 });
 export type ExportSettings = z.infer<typeof ExportSettingsSchema>;
 
-/** Dataset and evidence records are filled in by the data-storytelling layer (Day 3/4). */
+/** A dataset attached to the project. The CSV itself is stored per version next to the project. */
 export const DatasetRefSchema = z.object({
-  id: z.string(),
-  name: z.string(),
+  id: z.string().regex(/^[A-Za-z0-9_-]{6,40}$/),
+  name: z.string().max(200),
   version: z.number().int().min(1),
+  /** sha256 of the normalised CSV text of the current version. */
   hash: z.string(),
+  rowCount: z.number().int().min(0),
+  columnCount: z.number().int().min(0),
+  addedAt: z.string(),
 });
+export type DatasetRef = z.infer<typeof DatasetRefSchema>;
 
-export const EvidenceRefSchema = z.object({
+/**
+ * One numerical claim: which dataset version it came from, the exact calculation, the result,
+ * and every scene that displays it.
+ */
+export const EvidenceSchema = z.object({
   id: z.string(),
   datasetId: z.string(),
+  datasetVersion: z.number().int().min(1),
   datasetHash: z.string(),
+  /** Human description of the calculation, e.g. "Sum of revenue". */
+  label: z.string().max(300),
+  calc: CalcSpecSchema,
+  result: CalcResultSchema,
+  format: NumberFormatSchema,
+  unit: z.string().nullable(),
+  sceneIds: z.array(z.string()),
+  computedAt: z.string(),
 });
+export type Evidence = z.infer<typeof EvidenceSchema>;
 
 export const ProjectSchema = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
@@ -157,7 +207,7 @@ export const ProjectSchema = z.object({
   aspectRatio: AspectRatioSchema,
   scenes: z.array(SceneSchema).min(1).max(100),
   datasets: z.array(DatasetRefSchema),
-  evidence: z.array(EvidenceRefSchema),
+  evidence: z.array(EvidenceSchema),
   exportSettings: ExportSettingsSchema,
 });
 export type Project = z.infer<typeof ProjectSchema>;

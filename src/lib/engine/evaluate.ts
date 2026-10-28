@@ -1,5 +1,6 @@
 import type { Animation, Easing, Project, Scene, SceneElement } from "@/lib/schema/project";
 import { CANVAS_SIZES } from "@/lib/schema/project";
+import { renderTemplate } from "@/lib/data/format";
 
 /**
  * Pure, deterministic animation evaluation.
@@ -16,6 +17,8 @@ export interface ElementVisualState {
   scale: number;
   /** 0..1 data reveal progress used by charts (bars grow, lines draw). */
   reveal: number;
+  /** Text to display when it differs from the stored text (count-up numbers mid-animation). */
+  text?: string;
 }
 
 export interface SceneVisualState {
@@ -105,6 +108,12 @@ export function evaluateElement(el: SceneElement, sceneDurationMs: number, timeM
   }
 
   const opacity = clamp01(el.opacity * enter.opacity * exit.opacity);
+  const reveal = el.enter.preset === "none" ? 1 : ease(el.enter.easing === "backOut" ? "easeOut" : el.enter.easing, enterP);
+  let text: string | undefined;
+  if (el.type === "text" && el.binding?.countUp && reveal < 1) {
+    const b = el.binding;
+    text = renderTemplate(b.template, b.values.map((v) => v * reveal), b.formats, (i) => b.units[i] ?? undefined, b.strings);
+  }
   return {
     element: el,
     visible: opacity > 0.001,
@@ -112,7 +121,8 @@ export function evaluateElement(el: SceneElement, sceneDurationMs: number, timeM
     translateX: enter.translateX + exit.translateX,
     translateY: enter.translateY + exit.translateY,
     scale: enter.scale * exit.scale,
-    reveal: el.enter.preset === "none" ? 1 : ease(el.enter.easing === "backOut" ? "easeOut" : el.enter.easing, enterP),
+    reveal,
+    text,
   };
 }
 

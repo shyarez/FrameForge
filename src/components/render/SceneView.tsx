@@ -22,7 +22,7 @@ export function resolveAssetSrc(projectId: string, src: string): string {
   return "";
 }
 
-function ElementBody({ el, reveal, projectId }: { el: SceneElement; reveal: number; projectId: string }) {
+function ElementBody({ el, reveal, text, projectId }: { el: SceneElement; reveal: number; text?: string; projectId: string }) {
   switch (el.type) {
     case "text":
       return (
@@ -40,7 +40,7 @@ function ElementBody({ el, reveal, projectId }: { el: SceneElement; reveal: numb
             overflowWrap: "break-word",
           }}
         >
-          {el.text}
+          {text ?? el.text}
         </div>
       );
     case "shape":
@@ -89,7 +89,7 @@ function ElementNode({ s, projectId, hidden }: { s: ElementVisualState; projectI
   };
   return (
     <div style={style} data-element-id={el.id}>
-      <ElementBody el={el} reveal={s.reveal} projectId={projectId} />
+      <ElementBody el={el} reveal={s.reveal} text={s.text} projectId={projectId} />
     </div>
   );
 }
