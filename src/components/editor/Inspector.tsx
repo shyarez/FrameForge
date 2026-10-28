@@ -2,6 +2,7 @@
 
 import { ArrowDown, ArrowUp, BarChart3, Copy, Image as ImageIcon, Shapes, Trash2, Type } from "lucide-react";
 import { useDraft } from "@/lib/client/useDraft";
+import { formatValue } from "@/lib/data/format";
 import {
   AnimationPresetSchema,
   EasingSchema,
@@ -144,6 +145,42 @@ function ImageFields({ el, update, styleUpdate }: { el: ImageElement; update: (p
   );
 }
 
+/** Which evidence records an element displays: calculation, value and source dataset version. */
+function EvidenceSection({ el }: { el: SceneElement }) {
+  const project = useEditor((s) => s.project)!;
+  const ids = el.type === "text" ? el.binding?.evidence ?? [] : el.type === "chart" && el.binding ? [el.binding.evidenceId] : [];
+  if (!ids.length) return null;
+  return (
+    <section className="border-b-2 border-line px-4 py-4">
+      <h3 className="mb-3 flex items-center gap-2 font-display text-[15px] font-semibold text-mint-ink">
+        <span aria-hidden className="size-2 bg-mint" />
+        Evidence
+      </h3>
+      <ul className="flex flex-col gap-2">
+        {ids.map((id) => {
+          const ev = project.evidence.find((e) => e.id === id);
+          const ds = ev && project.datasets.find((d) => d.id === ev.datasetId);
+          if (!ev) return <li key={id} className="text-xs text-coral-ink">Missing evidence {id}</li>;
+          const value =
+            ev.result.kind === "scalar"
+              ? formatValue(ev.result.value, ev.format, ev.unit ?? undefined) + (ev.result.label ? ` (${ev.result.label})` : "")
+              : `${ev.result.points.length} points`;
+          return (
+            <li key={id} className="px-box-flat bg-ink p-2.5 text-xs">
+              <p className="font-semibold">{ev.label}</p>
+              <p className="mt-1 font-mono text-[11px] text-yellow-ink">= {value}</p>
+              <p className="mt-1 font-mono text-[10px] break-all text-mute">{JSON.stringify(ev.calc)}</p>
+              <p className="mt-1 text-[10px] text-mute">
+                {ds?.name ?? ev.datasetId} · v{ev.datasetVersion} · {ev.sceneIds.length} scene{ev.sceneIds.length === 1 ? "" : "s"}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 function ElementInspector({ el }: { el: SceneElement }) {
   const { updateElement, deleteElement, reorderElement, duplicateElement } = useEditor.getState();
   const update = (patch: Partial<SceneElement>) => updateElement(el.id, patch);
@@ -162,7 +199,9 @@ function ElementInspector({ el }: { el: SceneElement }) {
       {el.type === "text" && (
         <Section title="Text">
           <Field label="Content" className="col-span-2">
-            <CommitText multiline rows={3} value={el.text} onCommit={(text) => update({ text })} />
+            {/* A manual content edit replaces the data-bound text, so the binding is dropped (and the UI says so). */}
+            <CommitText multiline rows={3} value={el.text} onCommit={(text) => update(el.binding ? { text, binding: undefined } : { text })} />
+            {el.binding && <span className="text-[11px] text-mute">Editing this text unlinks it from its data.</span>}
           </Field>
           <Field label="Font">
             <Select value={el.fontFamily} onChange={(e) => styleUpdate({ fontFamily: e.target.value as typeof el.fontFamily })}>
@@ -204,6 +243,8 @@ function ElementInspector({ el }: { el: SceneElement }) {
           <NumberField label="Stroke width" value={el.strokeWidth} min={0} onCommit={(v) => styleUpdate({ strokeWidth: v, stroke: el.stroke ?? "#effffb" })} />
         </Section>
       )}
+
+      <EvidenceSection el={el} />
 
       {el.type === "image" && <ImageFields el={el} update={update} styleUpdate={styleUpdate} />}
 

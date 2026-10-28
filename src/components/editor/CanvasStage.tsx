@@ -179,7 +179,8 @@ export function CanvasStage() {
   const finishEditing = (text: string | null) => {
     const el = editing;
     setEditingId(null);
-    if (el?.type === "text" && text !== null && text !== el.text) useEditor.getState().updateElement(el.id, { text });
+    // Like the inspector: a manual content edit replaces data-bound text, so its binding is dropped.
+    if (el?.type === "text" && text !== null && text !== el.text) useEditor.getState().updateElement(el.id, el.binding ? { text, binding: undefined } : { text });
   };
 
   const hs = 12 / scale; // handle size in logical px so it stays constant on screen

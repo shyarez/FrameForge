@@ -14,7 +14,9 @@ export function ChartGraphic({ el, reveal }: { el: ChartElement; reveal: number 
   }
   const color = (i: number) => colors[i % colors.length];
   // Animated values use the precision of the dataset so counting-up numbers don't flicker decimals.
-  const decimals = Math.min(2, Math.max(0, ...data.map((d) => (String(d.value).split(".")[1] ?? "").length)));
+  // Large values read better without decimals; the underlying data keeps full precision.
+  const big = data.some((d) => Math.abs(d.value) >= 1000);
+  const decimals = big ? 0 : Math.min(2, Math.max(0, ...data.map((d) => (String(d.value).split(".")[1] ?? "").length)));
   const fmt = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   const labelSize = Math.max(16, Math.min(32, h * 0.05));
 

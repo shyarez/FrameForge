@@ -4,6 +4,8 @@ import { create } from "zustand";
 import { createElement, createScene, newId } from "@/lib/schema/factory";
 import { sceneRestTime, sceneStartTimes } from "@/lib/engine/evaluate";
 import type { AssetInfo } from "@/lib/server/assets";
+import type { Story } from "@/lib/data/story";
+import type { DatasetRef } from "@/lib/schema/project";
 import { projectDurationMs, type AspectRatio, type ElementType, type Project, type Scene, type SceneElement } from "@/lib/schema/project";
 
 /**
@@ -58,6 +60,11 @@ interface EditorState {
   reorderElement(id: string, dir: "forward" | "backward"): void;
   /** Copy of an element held for paste; not part of the document or history. */
   clipboard: SceneElement | null;
+  addDataset(ref: DatasetRef): void;
+  /** Detach a dataset: its evidence goes, and generated content keeps its current text but loses its data links. */
+  removeDataset(id: string): void;
+  /** Insert generated scenes after the selected scene, register their evidence, and select the first one. */
+  insertStory(story: Story): void;
   duplicateElement(id: string): void;
   copyElement(id: string): void;
   pasteElement(): void;
@@ -276,6 +283,34 @@ export const useEditor = create<EditorState>()((set, get) => {
         for (const s of d.scenes) s.elements = s.elements.filter((e) => e.id !== id);
       });
       if (get().selectedElementId === id) set({ selectedElementId: null });
+    },
+    addDataset(ref) {
+      commit((d) => {
+        d.datasets = [...d.datasets.filter((x) => x.id !== ref.id), ref];
+      });
+    },
+    removeDataset(id) {
+      commit((d) => {
+        const gone = new Set(d.evidence.filter((e) => e.datasetId === id).map((e) => e.id));
+        d.datasets = d.datasets.filter((x) => x.id !== id);
+        d.evidence = d.evidence.filter((e) => !gone.has(e.id));
+        for (const sc of d.scenes) {
+          if (sc.generated?.datasetId === id) delete sc.generated;
+          for (const el of sc.elements) {
+            if (el.type === "text" && el.binding?.evidence.some((e) => gone.has(e))) delete el.binding;
+            if (el.type === "chart" && el.binding && gone.has(el.binding.evidenceId)) delete el.binding;
+          }
+        }
+      });
+    },
+    insertStory(story) {
+      const at = get().selectedSceneId;
+      commit((d) => {
+        const i = d.scenes.findIndex((s) => s.id === at);
+        d.scenes.splice(i < 0 ? d.scenes.length : i + 1, 0, ...story.scenes);
+        d.evidence.push(...story.evidence);
+      });
+      if (story.scenes[0]) get().selectScene(story.scenes[0].id);
     },
     duplicateElement(id) {
       const p = get().project;
