@@ -252,7 +252,8 @@ export function Dashboard() {
       </nav>
 
       {/* Hero */}
-      <header data-theme="dark" className="relative flex h-[min(86vh,720px)] min-h-[520px] flex-col items-center overflow-hidden">
+      {/* text-paper re-resolves the text colour inside the dark scope; inherited colour would come from the page theme. */}
+      <header data-theme="dark" className="relative flex h-[min(86vh,720px)] min-h-[520px] flex-col items-center overflow-hidden text-paper">
         <PixelOcean className="absolute inset-0 h-full w-full" palette={ocean.palette} />
         <div className="absolute top-5 right-5 z-20">
           <PhaseButton phase={ocean.phase} mode={ocean.mode} onClick={ocean.cycle} />
@@ -271,7 +272,7 @@ export function Dashboard() {
             <br />
             <span className="transition-colors duration-1000" style={{ color: ocean.palette.titleAccent }}>Video Story</span>
           </motion.h1>
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="px-text-shadow mt-6 max-w-lg text-lg font-semibold">
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="px-text-thin mt-6 max-w-xl text-lg font-semibold text-white">
             Animate scenes, turn data into motion, and export real MP4s — frame by frame.
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }} className="mt-8 flex gap-4">

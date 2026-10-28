@@ -171,6 +171,15 @@ body {
   background-size: 24px 24px;
 }
 
+/* Thin, light outline for body-size text over busy art (the heavy outline is for big pixel type only). */
+.px-text-thin {
+  text-shadow:
+    -1px 0 0 rgb(0 0 0 / 0.45),
+    1px 0 0 rgb(0 0 0 / 0.45),
+    0 -1px 0 rgb(0 0 0 / 0.45),
+    0 1px 0 rgb(0 0 0 / 0.45);
+}
+
 /* Pixel text shadow for big headings. */
 .px-text-shadow {
   text-shadow:
