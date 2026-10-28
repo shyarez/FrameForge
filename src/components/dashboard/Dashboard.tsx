@@ -16,8 +16,9 @@ import { PixelOcean } from "@/components/pixel/PixelOcean";
 import { Sprite } from "@/components/pixel/Sprite";
 import type { SpriteName } from "@/components/pixel/sprites";
 import { ArcadeLabel, Button, Field, IconButton, Select, TextInput, cx } from "@/components/ui/primitives";
-import { ThemeToggle } from "@/components/theme/theme";
+import { ThemeToggle, useTheme } from "@/components/theme/theme";
 import { PhaseButton, useOceanPhase } from "./OceanClock";
+import { SURFACES, surfaceVars, surfacesAt } from "./phaseSurfaces";
 
 /** Scene thumbnail that plays its animation in a loop while hovered. */
 function LivePreview({ scene, aspect, projectId, active }: { scene: Scene; aspect: AspectRatio; projectId: string; active: boolean }) {
@@ -219,6 +220,9 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState<TemplateId | null>(null);
   const ocean = useOceanPhase();
+  const theme = useTheme();
+  // Page colours follow the same phase as the water (dashboard only; the editor keeps fixed colours).
+  const surface = ocean.mode === "auto" ? surfacesAt(ocean.hour, theme) : SURFACES[ocean.mode][theme];
 
   useEffect(() => {
     api.listProjects().then((r) => setProjects(r.projects)).catch((e) => setError(e.message));
@@ -235,8 +239,11 @@ export function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen">
-      <nav className="sticky top-0 z-40 border-b-[3px] border-line bg-ink/95">
+    <div
+      className="ff-phase-surface min-h-screen text-paper"
+      style={{ ...surfaceVars(surface), background: "linear-gradient(to bottom, var(--color-night) 0px, var(--color-ink) 1400px)" } as React.CSSProperties}
+    >
+      <nav className="sticky top-0 z-40 border-b-[3px] border-line bg-nav">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-8 px-6">
           <Wordmark />
           <div className="hidden items-center gap-6 font-display text-[15px] text-mute md:flex">
@@ -254,7 +261,7 @@ export function Dashboard() {
       {/* Hero */}
       {/* text-paper re-resolves the text colour inside the dark scope; inherited colour would come from the page theme. */}
       <header data-theme="dark" className="relative flex h-[min(86vh,720px)] min-h-[520px] flex-col items-center overflow-hidden text-paper">
-        <PixelOcean className="absolute inset-0 h-full w-full" palette={ocean.palette} />
+        <PixelOcean className="absolute inset-0 h-full w-full" palette={ocean.palette} floor={surface.night} />
         <div className="absolute top-5 right-5 z-20">
           <PhaseButton phase={ocean.phase} mode={ocean.mode} onClick={ocean.cycle} />
         </div>

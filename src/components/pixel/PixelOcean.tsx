@@ -106,7 +106,7 @@ const FISH_COLOURS: Swap[] = [
 /** Fill via style so CSS can transition it when the time-of-day palette changes. */
 const tint = (fill: string) => ({ className: "ff-tint", style: { fill } });
 
-export function PixelOcean({ className, palette: p }: { className?: string; palette: OceanPalette }) {
+export function PixelOcean({ className, palette: p, floor = "#031a24" }: { className?: string; palette: OceanPalette; /** Page colour the sea floor dithers into. */ floor?: string }) {
   const ref = useRef<SVGSVGElement>(null);
 
   // Parallax: pointer position drives CSS variables; no React re-render per move.
@@ -186,7 +186,7 @@ export function PixelOcean({ className, palette: p }: { className?: string; pale
         {[
           // Each water band dithers into the one above it.
           ...water.map((c, i) => [`wd${i}`, c, i === 0 ? p.surface : water[i - 1]] as const),
-          ["s1", "#031a24", p.sandDeep] as const,
+          ["s1", floor, p.sandDeep] as const,
         ].map(([id, a, b]) => (
           <pattern key={id} id={id} width={2} height={2} patternUnits="userSpaceOnUse">
             <rect width={2} height={2} {...tint(a)} />

@@ -24,6 +24,7 @@
   --color-edge: #031a24;
   --color-shadow: #010f17;
   --color-grid: rgb(79 240 208 / 0.05);
+  --color-nav: #04202b;
 
   /* UI headings are pixel type; video text keeps its own stacks (see SceneView FONT_STACKS). */
   --font-display: var(--ff-pixel), system-ui, sans-serif;
@@ -64,6 +65,7 @@ html {
   --color-edge: #031a24;
   --color-shadow: #010f17;
   --color-grid: rgb(79 240 208 / 0.05);
+  --color-nav: #04202b;
   color-scheme: dark;
 }
 [data-theme="light"] {
@@ -86,6 +88,7 @@ html {
   --color-edge: #0b4652;
   --color-shadow: #a9d3ca;
   --color-grid: rgb(7 43 54 / 0.06);
+  --color-nav: #ddeee8;
   color-scheme: light;
 }
 
@@ -93,6 +96,25 @@ body {
   background: var(--color-ink);
   color: var(--color-paper);
   font-family: var(--font-sans);
+}
+
+/*
+ * Dashboard page colours follow the ocean phase (see phaseSurfaces.ts). Registering the variables
+ * as <color> lets them animate, so a phase change fades the whole page instead of snapping.
+ * Only the dashboard wrapper declares the transition; the editor never changes.
+ */
+@property --color-ink { syntax: "<color>"; inherits: true; initial-value: #031a24; }
+@property --color-night { syntax: "<color>"; inherits: true; initial-value: #05242f; }
+@property --color-panel { syntax: "<color>"; inherits: true; initial-value: #082f3c; }
+@property --color-raised { syntax: "<color>"; inherits: true; initial-value: #0e4351; }
+@property --color-line { syntax: "<color>"; inherits: true; initial-value: #186571; }
+@property --color-mute { syntax: "<color>"; inherits: true; initial-value: #8cc4c4; }
+@property --color-paper { syntax: "<color>"; inherits: true; initial-value: #effffb; }
+@property --color-nav { syntax: "<color>"; inherits: true; initial-value: #04202b; }
+.ff-phase-surface {
+  transition:
+    --color-ink 1.2s ease, --color-night 1.2s ease, --color-panel 1.2s ease, --color-raised 1.2s ease,
+    --color-line 1.2s ease, --color-mute 1.2s ease, --color-paper 1.2s ease, --color-nav 1.2s ease;
 }
 
 /* ---------- Pixel UI kit ---------- */

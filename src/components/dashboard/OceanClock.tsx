@@ -26,7 +26,7 @@ export function useOceanPhase() {
   const palette: OceanPalette = mode === "auto" ? paletteAt(hour) : PHASES[mode];
   const phase: PhaseName = mode === "auto" ? phaseAt(hour) : mode;
   const cycle = () => setMode((m) => ORDER[(ORDER.indexOf(m) + 1) % ORDER.length]);
-  return { palette, phase, mode, cycle };
+  return { palette, phase, mode, hour, cycle };
 }
 
 export function PhaseButton({ phase, mode, onClick }: { phase: PhaseName; mode: Mode; onClick: () => void }) {

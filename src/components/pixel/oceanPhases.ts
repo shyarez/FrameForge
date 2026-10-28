@@ -166,15 +166,21 @@ export function gradientBands(stops: readonly string[], count: number): string[]
   });
 }
 
-/** Palette for a local hour in [0, 24). */
-export function paletteAt(hour: number): OceanPalette {
+/** The two phases surrounding a local hour and how far between them it is (shared by water and page colours). */
+export function phaseWeights(hour: number): { a: PhaseName; b: PhaseName; t: number } {
   const h = ((hour % 24) + 24) % 24;
   for (let i = 0; i < KEYS.length - 1; i++) {
     const [h0, p0] = KEYS[i];
     const [h1, p1] = KEYS[i + 1];
-    if (h >= h0 && h < h1) return mixPalette(PHASES[p0], PHASES[p1], (h - h0) / (h1 - h0));
+    if (h >= h0 && h < h1) return { a: p0, b: p1, t: (h - h0) / (h1 - h0) };
   }
-  return PHASES.night;
+  return { a: "night", b: "night", t: 0 };
+}
+
+/** Palette for a local hour in [0, 24). */
+export function paletteAt(hour: number): OceanPalette {
+  const { a, b, t } = phaseWeights(hour);
+  return mixPalette(PHASES[a], PHASES[b], t);
 }
 
 /** Dominant phase name for a local hour, for labels. */
