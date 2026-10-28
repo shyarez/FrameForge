@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+/* FrameForge palette: deep night base with lavender / electric blue / coral / warm yellow accents. */
+@theme {
+  --color-ink: #0f0e2a;
+  --color-night: #161538;
+  --color-panel: #1c1a45;
+  --color-raised: #252257;
+  --color-line: #34307a;
+  --color-mute: #8f8bc4;
+  --color-paper: #f7f4ff;
+  --color-lavender: #b8a4ff;
+  --color-blue: #4d7cff;
+  --color-coral: #ff6b6b;
+  --color-yellow: #ffd166;
+  --color-mint: #5ee6b5;
+
+  --font-display: var(--ff-display), system-ui, sans-serif;
+  --font-sans: var(--ff-ui), system-ui, sans-serif;
+  --font-mono: var(--ff-code), ui-monospace, monospace;
+
+  --shadow-chunky: 0 4px 0 0 #0a0920;
+  --shadow-chunky-sm: 0 2px 0 0 #0a0920;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+}
+
+/* Subtle dotted texture used on large surfaces. */
+.bg-dots {
+  background-image: radial-gradient(rgb(184 164 255 / 0.12) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* Tactile "pressable" buttons: they sit on a hard shadow and sink when pressed. */
+.btn-press {
+  box-shadow: var(--shadow-chunky-sm);
+  transition: transform 80ms ease, box-shadow 80ms ease, background-color 120ms ease;
+}
+.btn-press:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-yellow);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Thin scrollbars for dense editor panels. */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
