@@ -10,7 +10,7 @@ export function Wordmark() {
     <span className="flex items-center gap-2.5">
       <Logo scale={2} />
       <span className="font-display text-xl font-bold tracking-wide">
-        FrameForge<span className="text-aqua"> Studio</span>
+        FrameForge<span className="text-aqua-ink"> Studio</span>
       </span>
     </span>
   );

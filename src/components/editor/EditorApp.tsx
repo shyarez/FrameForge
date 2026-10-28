@@ -148,10 +148,10 @@ export function EditorApp({ projectId }: { projectId: string }) {
     return (
       <main className="bg-dots flex h-screen flex-col items-center justify-center gap-4 text-center">
         <Sprite name="bot" scale={5} />
-        <ArcadeLabel className="text-coral">Game over</ArcadeLabel>
+        <ArcadeLabel className="text-coral-ink">Game over</ArcadeLabel>
         <h1 className="font-display text-3xl font-bold">Couldn&apos;t open this project</h1>
         <p className="text-sm text-mute">{loadError}</p>
-        <Link href="/" className="px-btn mt-2 bg-yellow px-4 py-2 font-display font-semibold text-ink">Back to projects</Link>
+        <Link href="/" className="px-btn mt-2 bg-yellow px-4 py-2 font-display font-semibold text-onaccent">Back to projects</Link>
       </main>
     );
   }
@@ -159,7 +159,7 @@ export function EditorApp({ projectId }: { projectId: string }) {
     return (
       <main className="bg-dots flex h-screen flex-col items-center justify-center gap-5" aria-busy="true">
         <Sprite name="bot" scale={5} className="animate-bob" />
-        <ArcadeLabel className="text-aqua">
+        <ArcadeLabel className="text-aqua-ink">
           Loading level<span className="ff-blink">_</span>
         </ArcadeLabel>
       </main>

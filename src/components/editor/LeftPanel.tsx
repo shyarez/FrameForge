@@ -15,7 +15,7 @@ function Tile({ icon, label, hint, onClick, tint }: { icon: ReactNode; label: st
       onClick={onClick}
       className="px-box-flat group flex flex-col items-start gap-2.5 bg-panel p-3 text-left transition-transform duration-100 hover:-translate-y-0.5 hover:[--px-c:var(--color-aqua)] active:translate-y-0.5 motion-reduce:hover:translate-y-0"
     >
-      <span className="px-box-flat flex size-9 items-center justify-center text-ink [--px-c:#010f17]" style={{ background: tint }}>
+      <span className="px-box-flat flex size-9 items-center justify-center text-onaccent [--px-c:var(--color-edge)]" style={{ background: tint }}>
         {icon}
       </span>
       <span>
@@ -46,7 +46,7 @@ export function LeftPanel() {
             onClick={() => setTab(id)}
             className={cx(
               "flex flex-1 items-center justify-center gap-1.5 py-2 font-display text-sm font-semibold transition-colors",
-              tab === id ? "px-box-flat bg-raised text-yellow [--px-c:var(--color-yellow)]" : "text-mute hover:text-paper",
+              tab === id ? "px-box-flat bg-raised text-yellow-ink [--px-c:var(--color-yellow)]" : "text-mute hover:text-paper",
             )}
           >
             {icon}

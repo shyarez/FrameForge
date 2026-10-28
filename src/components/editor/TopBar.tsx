@@ -6,16 +6,17 @@ import { useDraft } from "@/lib/client/useDraft";
 import { AspectRatioSchema, type AspectRatio } from "@/lib/schema/project";
 import { Logo } from "@/components/brand/Logo";
 import { Button, IconButton, Select } from "@/components/ui/primitives";
+import { ThemeToggle } from "@/components/theme/theme";
 import { useEditor } from "@/store/editor";
 
 function SaveIndicator() {
   const saveState = useEditor((s) => s.saveState);
   const saveError = useEditor((s) => s.saveError);
   const map = {
-    saved: [<Check key="i" className="size-3.5 text-mint" />, "Saved"],
+    saved: [<Check key="i" className="size-3.5 text-mint-ink" />, "Saved"],
     dirty: [<span key="i" className="ff-blink size-2 bg-yellow" />, "Unsaved changes"],
     saving: [<Loader2 key="i" className="size-3.5 animate-spin" />, "Saving…"],
-    error: [<CloudOff key="i" className="size-3.5 text-coral" />, saveError ?? "Save failed"],
+    error: [<CloudOff key="i" className="size-3.5 text-coral-ink" />, saveError ?? "Save failed"],
   } as const;
   const [icon, label] = map[saveState];
   return (
@@ -48,7 +49,7 @@ export function TopBar({ onSave, onExport }: { onSave: () => void; onExport: () 
       />
       <SaveIndicator />
 
-      <div className="ml-auto flex items-center gap-2.5">
+      <div className="ml-auto flex items-center gap-4">
         <IconButton label="Undo (Ctrl+Z)" onClick={undo} disabled={!canUndo}><Undo2 className="size-4" /></IconButton>
         <IconButton label="Redo (Ctrl+Shift+Z)" onClick={redo} disabled={!canRedo}><Redo2 className="size-4" /></IconButton>
         <div className="mx-2 h-7 w-[3px] bg-line" />
@@ -57,6 +58,7 @@ export function TopBar({ onSave, onExport }: { onSave: () => void; onExport: () 
             <option key={a} value={a}>{a}</option>
           ))}
         </Select>
+        <ThemeToggle />
         <Button onClick={onSave} title="Save (Ctrl+S)"><Save className="size-4" /> Save</Button>
         <Button variant="primary" onClick={onExport}><Film className="size-4" /> Export</Button>
       </div>

@@ -54,3 +54,9 @@ Env overrides: `FF_CHROME_PATH`, `FF_FFMPEG_PATH`, `FF_DATA_DIR`.
 - Editor: same layout and density, with the pixel styling applied; export dialog has a spinning reel sprite and a segmented progress bar.
 - New video text fonts: `pixel` and `arcade` (schema enum extended; existing projects remain valid).
 - Verified: typecheck and lint clean; 23 unit tests (sprite grid validation added); 6/6 browser e2e tests pass, including a real UI export.
+
+## Themes — light/dark + time-of-day ocean
+
+- **Light/dark theme** for the whole app (`src/components/theme/`). It defaults to the system preference, a toggle in the dashboard nav and editor top bar overrides it, and the choice persists in localStorage. An inline boot script sets `data-theme` before first paint, so there is no flash. Colours are role tokens (`*-ink` accent text, `onaccent`, `edge`, `shadow`, `grid`), so both themes share all components.
+- **Contrast is tested**: `tests/unit/themeContrast.test.ts` parses both theme blocks from `globals.css` and asserts WCAG AA (≥ 4.5:1) for 16 text/background pairs per theme.
+- **Time-of-day ocean** (dashboard hero only, always in dark scope): `oceanPhases.ts` defines dawn / day / sunset / night palettes keyframed by local hour and blends every colour between neighbouring phases. Night adds jellyfish halos, glowing plankton and moonlight on the surface; rays fade out. A hero button cycles Auto → Dawn → Day → Sunset → Night for demos, with CSS colour transitions. The editor workspace deliberately does not change with time.

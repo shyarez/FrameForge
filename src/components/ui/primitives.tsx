@@ -7,11 +7,11 @@ const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).jo
 type Variant = "primary" | "ghost" | "danger" | "soft" | "blue" | "mint";
 
 const VARIANTS: Record<Variant, string> = {
-  primary: "px-btn bg-yellow text-ink",
+  primary: "px-btn bg-yellow text-onaccent",
   blue: "px-btn bg-blue text-paper",
-  mint: "px-btn bg-mint text-ink",
-  soft: "px-btn bg-raised text-paper [--px-c:#010f17]",
-  danger: "px-btn bg-coral text-ink",
+  mint: "px-btn bg-mint text-onaccent",
+  soft: "px-btn bg-raised text-paper [--px-c:var(--color-edge)]",
+  danger: "px-btn bg-coral text-onaccent",
   ghost: "text-mute hover:text-paper hover:bg-raised",
 };
 

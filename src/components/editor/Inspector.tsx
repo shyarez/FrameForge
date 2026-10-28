@@ -59,7 +59,7 @@ function ColorField({ label, value, onCommit }: { label: string; value: string; 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="border-b-2 border-line px-4 py-4">
-      <h3 className="mb-3.5 flex items-center gap-2 font-display text-[15px] font-semibold text-aqua">
+      <h3 className="mb-3.5 flex items-center gap-2 font-display text-[15px] font-semibold text-aqua-ink">
         <span aria-hidden className="size-2 bg-aqua" />
         {title}
       </h3>
@@ -127,7 +127,7 @@ function ElementInspector({ el }: { el: SceneElement }) {
         <CommitText aria-label="Element name" value={el.name} onCommit={(name) => update({ name })} className="flex-1 font-medium" />
         <IconButton label="Bring forward" onClick={() => reorderElement(el.id, "forward")}><ArrowUp className="size-4" /></IconButton>
         <IconButton label="Send backward" onClick={() => reorderElement(el.id, "backward")}><ArrowDown className="size-4" /></IconButton>
-        <IconButton label="Delete element" onClick={() => deleteElement(el.id)} className="hover:text-coral"><Trash2 className="size-4" /></IconButton>
+        <IconButton label="Delete element" onClick={() => deleteElement(el.id)} className="hover:text-coral-ink"><Trash2 className="size-4" /></IconButton>
       </div>
 
       {el.type === "text" && (
@@ -256,7 +256,7 @@ export function Inspector() {
   return (
     <aside className="scroll-thin flex w-72 shrink-0 flex-col overflow-y-auto border-l-[3px] border-line bg-night" aria-label="Properties">
       <div className="flex h-11 shrink-0 items-center justify-between border-b-[3px] border-line bg-panel px-4">
-        <h2 className="font-arcade text-[10px] tracking-wider text-yellow uppercase">{hit ? "Element" : "Properties"}</h2>
+        <h2 className="font-arcade text-[10px] tracking-wider text-yellow-ink uppercase">{hit ? "Element" : "Properties"}</h2>
         {hit && (
           <Button variant="ghost" className="h-7 px-2 text-xs" onClick={() => useEditor.getState().selectElement(null)}>
             Scene settings

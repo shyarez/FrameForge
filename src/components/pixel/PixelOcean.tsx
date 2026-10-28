@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import type { OceanPalette } from "./oceanPhases";
 import { SpriteG, type Swap } from "./Sprite";
 
 /**
@@ -99,7 +100,10 @@ const FISH_COLOURS: Swap[] = [
   { f: "#7be495", F: "#ffd166" },
 ];
 
-export function PixelOcean({ className }: { className?: string }) {
+/** Fill via style so CSS can transition it when the time-of-day palette changes. */
+const tint = (fill: string) => ({ className: "ff-tint", style: { fill } });
+
+export function PixelOcean({ className, palette: p }: { className?: string; palette: OceanPalette }) {
   const ref = useRef<SVGSVGElement>(null);
 
   // Parallax: pointer position drives CSS variables; no React re-render per move.
@@ -176,34 +180,47 @@ export function PixelOcean({ className }: { className?: string }) {
       <defs>
         {(
           [
-            ["w1", "#3fd8c9", "#8af5e4"],
-            ["w2", "#1ba5b3", "#3fd8c9"],
-            ["w3", "#11809a", "#1ba5b3"],
-            ["w4", "#0b5f7b", "#11809a"],
-            ["w5", "#08465f", "#0b5f7b"],
-            ["s1", "#031a24", "#d4b06f"],
+            ["w1", p.bands[0], p.surface],
+            ["w2", p.bands[1], p.bands[0]],
+            ["w3", p.bands[2], p.bands[1]],
+            ["w4", p.bands[3], p.bands[2]],
+            ["w5", p.bands[4], p.bands[3]],
+            ["s1", "#031a24", p.sandDeep],
           ] as const
         ).map(([id, a, b]) => (
           <pattern key={id} id={id} width={2} height={2} patternUnits="userSpaceOnUse">
-            <rect width={2} height={2} fill={a} />
-            <rect width={1} height={1} fill={b} />
-            <rect x={1} y={1} width={1} height={1} fill={b} />
+            <rect width={2} height={2} {...tint(a)} />
+            <rect width={1} height={1} {...tint(b)} />
+            <rect x={1} y={1} width={1} height={1} {...tint(b)} />
           </pattern>
         ))}
       </defs>
 
       {/* Water column, light at the surface and deepening */}
-      <rect width={W} height={H} fill="#08465f" />
-      <rect width={W} height={4} fill="#8af5e4" />
+      <rect width={W} height={H} {...tint(p.bands[4])} />
+      <rect width={W} height={4} {...tint(p.surface)} />
       <rect y={4} width={W} height={2} fill="url(#w1)" />
-      <rect y={6} width={W} height={8} fill="#3fd8c9" />
+      <rect y={6} width={W} height={8} {...tint(p.bands[0])} />
       <rect y={14} width={W} height={2} fill="url(#w2)" />
-      <rect y={16} width={W} height={14} fill="#1ba5b3" />
+      <rect y={16} width={W} height={14} {...tint(p.bands[1])} />
       <rect y={30} width={W} height={2} fill="url(#w3)" />
-      <rect y={32} width={W} height={28} fill="#11809a" />
+      <rect y={32} width={W} height={28} {...tint(p.bands[2])} />
       <rect y={60} width={W} height={2} fill="url(#w4)" />
-      <rect y={62} width={W} height={34} fill="#0b5f7b" />
+      <rect y={62} width={W} height={34} {...tint(p.bands[3])} />
       <rect y={96} width={W} height={2} fill="url(#w5)" />
+
+      {/* Moonlight shimmer on the surface at night */}
+      <g opacity={p.moon * 0.7} className="ff-tint">
+        <g className="ff-sway-a" fill="#d8ecff">
+          <rect x={228} y={1} width={22} height={1} />
+          <rect x={232} y={3} width={14} height={1} />
+          <rect x={236} y={5} width={6} height={1} />
+        </g>
+        <g className="ff-sway-b" fill="#d8ecff">
+          <rect x={226} y={2} width={24} height={1} />
+          <rect x={234} y={4} width={12} height={1} />
+        </g>
+      </g>
 
       {/* Surface ripples (two frames) */}
       <g className="ff-sway-a" fill="#effffb">
@@ -214,23 +231,16 @@ export function PixelOcean({ className }: { className?: string }) {
       </g>
 
       {/* God rays */}
-      <g fill="#effffb">
+      <g opacity={p.rays} className="ff-tint" style={{ fill: p.ray }}>
         {[20, 70, 130, 190, 250].map((x, i) => (
           <polygon key={x} points={`${x},0 ${x + 14},0 ${x + 44},120 ${x + 26},120`} className="ff-ray" style={{ animationDelay: `${i * 0.7}s` }} />
         ))}
       </g>
 
-      {/* Drifting plankton motes */}
-      <g style={layer(2)}>
-        {scene.motes.map((m, i) => (
-          <rect key={i} x={m.x} y={m.y} width={1} height={1} fill="#bff8ee" className="animate-twinkle" style={{ animationDelay: `${m.d}s` }} />
-        ))}
-      </g>
-
       {/* Far reef silhouette */}
       <g style={layer(4)}>
-        <path d={ridgePath(scene.farReef, 2)} fill="#0a536b" />
-        {scene.kelp.map((k, i) => <Blade key={i} {...k} c1="#1d7a5a" c2="#2a9a6c" />)}
+        <path d={ridgePath(scene.farReef, 2)} {...tint(p.farReef)} />
+        {scene.kelp.map((k, i) => <Blade key={i} {...k} c1={p.kelp1} c2={p.kelp2} />)}
       </g>
 
       {/* Fish in the middle water */}
@@ -254,13 +264,13 @@ export function PixelOcean({ className }: { className?: string }) {
 
       {/* Mid reef */}
       <g style={layer(7)}>
-        <path d={ridgePath(scene.midReef, 2)} fill="#073a4f" />
+        <path d={ridgePath(scene.midReef, 2)} {...tint(p.midReef)} />
       </g>
 
       {/* Seafloor */}
       <g style={layer(10)}>
-        <path d={ridgePath(scene.sand, 4)} fill="#e9c98b" />
-        <rect y={142} width={W} height={8} fill="#d4b06f" />
+        <path d={ridgePath(scene.sand, 4)} {...tint(p.sand)} />
+        <rect y={142} width={W} height={8} {...tint(p.sandDeep)} />
         {scene.pebbles.map((p, i) => <rect key={i} x={p.x} y={p.y} width={2} height={1} fill={p.c} />)}
         {scene.domes.map((d, i) => <Dome key={i} {...d} />)}
         {scene.corals.map((c, i) => <Coral key={i} {...c} />)}
@@ -288,6 +298,32 @@ export function PixelOcean({ className }: { className?: string }) {
           <g key={i} className="ff-rise" style={{ animationDelay: `-${b.d}s`, animationDuration: `${b.dur}s` }}>
             <SpriteG name="bubble" x={b.x} y={b.y} />
           </g>
+        ))}
+      </g>
+
+      {/* Mood wash: darkens the reef at night, warms it at sunset */}
+      <rect width={W} height={H} opacity={p.washAlpha} {...tint(p.wash)} />
+
+      {/* Bioluminescence: jelly halos and glowing plankton sit above the wash so they read at night */}
+      <g opacity={p.glow} className="ff-tint">
+        {(
+          [
+            [70, 38, "#ff9cc2", "0s"],
+            [286, 20, "#c9a7ff", "-2.5s"],
+          ] as const
+        ).map(([x, y, c, delay]) => (
+          <g key={x} className="ff-jelly" style={{ ...layer(3), animationDelay: delay }}>
+            <rect x={x - 3} y={y - 1} width={15} height={8} fill={c} opacity={0.18} />
+            <rect x={x - 1} y={y - 3} width={11} height={14} fill={c} opacity={0.14} />
+            <rect x={x + 1} y={y + 1} width={7} height={4} fill={c} opacity={0.35} />
+          </g>
+        ))}
+      </g>
+      {/* Twinkle animates each mote's opacity, so the glow strength is applied on the group. */}
+      <g style={layer(2)} opacity={0.55 + p.glow * 0.45}>
+        {scene.motes.map((m, i) => (
+          <rect key={i} x={m.x} y={m.y} width={p.glow > 0.5 && i % 3 === 0 ? 2 : 1} height={1}
+            className="animate-twinkle ff-tint" style={{ fill: p.mote, animationDelay: `${m.d}s` }} />
         ))}
       </g>
       <rect y={146} width={W} height={4} fill="url(#s1)" />

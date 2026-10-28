@@ -46,7 +46,7 @@ export function PlaybackBar() {
       <button
         onClick={() => setPlaying(!playing)}
         aria-label={playing ? "Pause" : "Play"}
-        className="px-btn inline-flex size-9 items-center justify-center bg-aqua text-ink"
+        className="px-btn inline-flex size-9 items-center justify-center bg-aqua text-onaccent"
       >
         {playing ? <Pause className="size-4" fill="currentColor" /> : <Play className="ml-0.5 size-4" fill="currentColor" />}
       </button>
@@ -88,7 +88,7 @@ export function Timeline() {
   return (
     <div className="flex h-40 shrink-0 flex-col border-t-[3px] border-line bg-night">
       <div className="flex h-10 items-center gap-1 px-4">
-        <span className="mr-3 font-arcade text-[10px] tracking-wider text-yellow uppercase">Scenes</span>
+        <span className="mr-3 font-arcade text-[10px] tracking-wider text-yellow-ink uppercase">Scenes</span>
         <IconButton label="Add scene after selected" onClick={addScene}>
           <Plus className="size-4" />
         </IconButton>
@@ -105,7 +105,7 @@ export function Timeline() {
           label="Delete scene"
           disabled={project.scenes.length <= 1}
           onClick={() => selectedSceneId && deleteScene(selectedSceneId)}
-          className="hover:text-coral"
+          className="hover:text-coral-ink"
         >
           <Trash2 className="size-4" />
         </IconButton>

@@ -74,11 +74,11 @@ export function ExportDialog({ open, onClose, save }: { open: boolean; onClose: 
             initial={{ y: 30, scale: 0.9 }} animate={{ y: 0, scale: 1 }} exit={{ y: 30, scale: 0.9 }} transition={{ type: "spring", stiffness: 400, damping: 24 }}>
             <div className="mb-6 flex items-start justify-between">
               <div className="flex items-center gap-4">
-                <span className="px-box-flat flex size-14 items-center justify-center bg-coral [--px-c:#010f17]">
+                <span className="px-box-flat flex size-14 items-center justify-center bg-coral [--px-c:var(--color-edge)]">
                   <Sprite name="reel" scale={3} className={busy ? "animate-spin-steps" : undefined} />
                 </span>
                 <div>
-                  <ArcadeLabel className="text-aqua">Final level</ArcadeLabel>
+                  <ArcadeLabel className="text-aqua-ink">Final level</ArcadeLabel>
                   <h2 id="export-title" className="mt-1.5 font-display text-2xl font-bold">Export MP4</h2>
                   <p className="mt-0.5 font-mono text-[11px] text-mute">{size.width}×{size.height} · {settings.fps} fps · {(projectDurationMs(project) / 1000).toFixed(1)}s · H.264</p>
                 </div>
@@ -107,8 +107,8 @@ export function ExportDialog({ open, onClose, save }: { open: boolean; onClose: 
               <div className="px-box-flat mb-6 bg-night p-4" aria-live="polite">
                 <div className="mb-3 flex items-center justify-between text-sm">
                   <span className="flex items-center gap-2 font-display text-[15px] font-semibold">
-                    {job.status === "done" && <CheckCircle2 className="size-4 text-mint" />}
-                    {job.status === "error" && <AlertTriangle className="size-4 text-coral" />}
+                    {job.status === "done" && <CheckCircle2 className="size-4 text-mint-ink" />}
+                    {job.status === "error" && <AlertTriangle className="size-4 text-coral-ink" />}
                     {STATUS_LABEL[job.status]}
                   </span>
                   <span className="font-mono text-xs text-mute">
@@ -116,13 +116,13 @@ export function ExportDialog({ open, onClose, save }: { open: boolean; onClose: 
                   </span>
                 </div>
                 <PixelProgress value={job.status === "done" ? 1 : pct / 100} color={job.status === "error" ? "bg-coral" : job.status === "done" ? "bg-mint" : "bg-yellow"} />
-                {job.status === "error" && <p className="mt-3 text-xs break-words text-coral">{job.error}</p>}
+                {job.status === "error" && <p className="mt-3 text-xs break-words text-coral-ink">{job.error}</p>}
                 {job.status === "done" && job.probe && (
                   <>
                     <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 500, damping: 14 }}
                       className="mt-4 flex items-center justify-center gap-3">
                       <Sprite name="star" scale={3} className="animate-twinkle" />
-                      <ArcadeLabel className="text-[11px] text-yellow">Level clear!</ArcadeLabel>
+                      <ArcadeLabel className="text-[11px] text-yellow-ink">Level clear!</ArcadeLabel>
                       <Sprite name="star" scale={3} className="animate-twinkle [animation-delay:0.6s]" />
                     </motion.div>
                     <video key={job.id} src={api.exportFileUrl(job.id)} controls className="px-box-flat mt-4 w-full bg-black" />
@@ -133,11 +133,11 @@ export function ExportDialog({ open, onClose, save }: { open: boolean; onClose: 
                 )}
               </div>
             )}
-            {error && <p className="px-box-flat mb-4 bg-coral/10 p-3 text-xs text-coral [--px-c:var(--color-coral)]">{error}</p>}
+            {error && <p className="px-box-flat mb-4 bg-coral/10 p-3 text-xs text-coral-ink [--px-c:var(--color-coral)]">{error}</p>}
 
             <div className="flex justify-end gap-4">
               {job?.status === "done" && (
-                <a href={api.exportFileUrl(job.id, true)} className="px-btn inline-flex h-9 items-center gap-2 bg-mint px-3.5 font-display text-[15px] font-semibold text-ink">
+                <a href={api.exportFileUrl(job.id, true)} className="px-btn inline-flex h-9 items-center gap-2 bg-mint px-3.5 font-display text-[15px] font-semibold text-onaccent">
                   <Download className="size-4" /> Download
                 </a>
               )}

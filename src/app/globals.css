@@ -15,6 +15,16 @@
   --color-yellow: #ffd166;
   --color-mint: #7be495;
 
+  /* Role tokens: accent text (*-ink), text on bright accents, pixel edges/shadows. */
+  --color-aqua-ink: #4ff0d0;
+  --color-yellow-ink: #ffd166;
+  --color-coral-ink: #ff77a8;
+  --color-mint-ink: #7be495;
+  --color-onaccent: #031a24;
+  --color-edge: #031a24;
+  --color-shadow: #010f17;
+  --color-grid: rgb(79 240 208 / 0.05);
+
   /* UI headings are pixel type; video text keeps its own stacks (see SceneView FONT_STACKS). */
   --font-display: var(--ff-pixel), system-ui, sans-serif;
   --font-arcade: var(--ff-arcade), ui-monospace, monospace;
@@ -28,6 +38,55 @@
 
 html {
   color-scheme: dark;
+}
+
+/*
+ * Themes. The default tokens above are the dark "deep sea" theme. data-theme is set on <html>
+ * before first paint (see ThemeScript); any subtree can pin a theme, e.g. the ocean hero stays dark.
+ */
+[data-theme="dark"] {
+  --color-ink: #031a24;
+  --color-night: #05242f;
+  --color-panel: #082f3c;
+  --color-raised: #0e4351;
+  --color-line: #186571;
+  --color-mute: #8cc4c4;
+  --color-paper: #effffb;
+  --color-aqua: #4ff0d0;
+  --color-blue: #38a6ff;
+  --color-coral: #ff77a8;
+  --color-yellow: #ffd166;
+  --color-mint: #7be495;
+  --color-aqua-ink: #4ff0d0;
+  --color-yellow-ink: #ffd166;
+  --color-coral-ink: #ff77a8;
+  --color-mint-ink: #7be495;
+  --color-edge: #031a24;
+  --color-shadow: #010f17;
+  --color-grid: rgb(79 240 208 / 0.05);
+  color-scheme: dark;
+}
+[data-theme="light"] {
+  --color-ink: #fffaf0;
+  --color-night: #f6efe0;
+  --color-panel: #fdf8ee;
+  --color-raised: #e3f3ee;
+  --color-line: #6fb3ad;
+  --color-mute: #3d6a70;
+  --color-paper: #072b36;
+  --color-aqua: #2fd9bd;
+  --color-blue: #2e93ec;
+  --color-coral: #ff6f9f;
+  --color-yellow: #ffc94a;
+  --color-mint: #6cd88a;
+  --color-aqua-ink: #08705f;
+  --color-yellow-ink: #8a5a00;
+  --color-coral-ink: #b8295e;
+  --color-mint-ink: #1a6e3c;
+  --color-edge: #0b4652;
+  --color-shadow: #a9d3ca;
+  --color-grid: rgb(7 43 54 / 0.06);
+  color-scheme: light;
 }
 
 body {
@@ -50,7 +109,7 @@ body {
  */
 .px-box {
   --px-c: var(--color-line);
-  --px-s: #010f17;
+  --px-s: var(--color-shadow);
   box-shadow:
     -3px 0 0 0 var(--px-c),
     3px 0 0 0 var(--px-c),
@@ -69,7 +128,7 @@ body {
 
 /* Chunky arcade buttons with bevel shading that sink when pressed. */
 .px-btn {
-  --px-c: var(--color-ink);
+  --px-c: var(--color-edge);
   --px-shade: rgb(0 0 0 / 0.28);
   --px-light: rgb(255 255 255 / 0.35);
   position: relative;
@@ -80,7 +139,7 @@ body {
     3px 0 0 0 var(--px-c),
     0 -3px 0 0 var(--px-c),
     0 3px 0 0 var(--px-c),
-    0 7px 0 -1px #010f17;
+    0 7px 0 -1px var(--color-shadow);
   transition: transform 60ms steps(1), filter 120ms;
 }
 .px-btn:hover:not(:disabled) {
@@ -107,18 +166,18 @@ body {
 /* Subtle pixel-grid texture for large surfaces. */
 .bg-dots {
   background-image:
-    linear-gradient(rgb(79 240 208 / 0.05) 2px, transparent 2px),
-    linear-gradient(90deg, rgb(79 240 208 / 0.05) 2px, transparent 2px);
+    linear-gradient(var(--color-grid) 2px, transparent 2px),
+    linear-gradient(90deg, var(--color-grid) 2px, transparent 2px);
   background-size: 24px 24px;
 }
 
 /* Pixel text shadow for big headings. */
 .px-text-shadow {
   text-shadow:
-    3px 3px 0 #010f17,
-    -1px -1px 0 #010f17,
-    1px -1px 0 #010f17,
-    -1px 1px 0 #010f17;
+    3px 3px 0 var(--color-shadow),
+    -1px -1px 0 var(--color-shadow),
+    1px -1px 0 var(--color-shadow),
+    -1px 1px 0 var(--color-shadow);
 }
 
 :focus-visible {
@@ -181,6 +240,9 @@ body {
   0%, 100% { opacity: 0.05; }
   50% { opacity: 0.13; }
 }
+
+/* Time-of-day colour changes blend instead of snapping. */
+.ff-tint { transition: fill 1.4s ease, opacity 1.4s ease; }
 
 .ff-swim-l { animation: ff-swim-l linear infinite; }
 .ff-swim-r { animation: ff-swim-r linear infinite; }

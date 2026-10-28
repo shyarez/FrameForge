@@ -16,6 +16,8 @@ import { PixelOcean } from "@/components/pixel/PixelOcean";
 import { Sprite } from "@/components/pixel/Sprite";
 import type { SpriteName } from "@/components/pixel/sprites";
 import { ArcadeLabel, Button, Field, IconButton, Select, TextInput, cx } from "@/components/ui/primitives";
+import { ThemeToggle } from "@/components/theme/theme";
+import { PhaseButton, useOceanPhase } from "./OceanClock";
 
 /** Scene thumbnail that plays its animation in a loop while hovered. */
 function LivePreview({ scene, aspect, projectId, active }: { scene: Scene; aspect: AspectRatio; projectId: string; active: boolean }) {
@@ -86,7 +88,7 @@ function ProjectCard({ p, onDelete, index }: { p: ProjectSummary; onDelete: () =
         <div className="relative border-b-[3px] border-line">
           <LivePreview scene={p.firstScene} aspect={p.aspectRatio} projectId={p.id} active={hover} />
           <span className={cx("absolute bottom-2 left-2 bg-ink/85 px-2 py-1.5 transition-opacity", hover ? "opacity-100" : "opacity-0")}>
-            <ArcadeLabel className="text-yellow">▶ Playing</ArcadeLabel>
+            <ArcadeLabel className="text-yellow-ink">▶ Playing</ArcadeLabel>
           </span>
         </div>
         <div className="flex flex-col gap-2 p-4">
@@ -95,14 +97,14 @@ function ProjectCard({ p, onDelete, index }: { p: ProjectSummary; onDelete: () =
           <div className="flex flex-wrap gap-2 text-xs text-mute">
             <Chip><Layers className="size-3.5" />{p.sceneCount} scene{p.sceneCount === 1 ? "" : "s"}</Chip>
             <Chip><Clock className="size-3.5" />{(p.durationMs / 1000).toFixed(1)}s</Chip>
-            <Chip><ArcadeLabel className="text-aqua">{p.aspectRatio}</ArcadeLabel></Chip>
+            <Chip><ArcadeLabel className="text-aqua-ink">{p.aspectRatio}</ArcadeLabel></Chip>
           </div>
         </div>
       </Link>
       <IconButton
         label={`Delete ${p.name}`}
         onClick={onDelete}
-        className="absolute top-2 right-2 bg-ink/90 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:text-coral"
+        className="absolute top-2 right-2 bg-ink/90 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:text-coral-ink"
       >
         <Trash2 className="size-4" />
       </IconButton>
@@ -150,7 +152,7 @@ function NewProjectForm({ initialTemplate, onCreated }: { initialTemplate: Templ
           </Select>
         </Field>
       </div>
-      {error && <p className="text-xs text-coral">{error}</p>}
+      {error && <p className="text-xs text-coral-ink">{error}</p>}
       <Button variant="primary" type="submit" disabled={busy} className="mt-2 h-11">
         {busy ? "Loading level…" : "Create project ▶"}
       </Button>
@@ -169,7 +171,7 @@ function QuestMap() {
   return (
     <section id="quest" className="relative mx-auto max-w-6xl scroll-mt-20 px-6 py-20">
       <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} className="mb-12 text-center">
-        <ArcadeLabel className="text-aqua">Ocean 1</ArcadeLabel>
+        <ArcadeLabel className="text-aqua-ink">Ocean 1</ArcadeLabel>
         <h2 className="px-text-shadow mt-4 font-display text-4xl font-bold sm:text-5xl">Your quest: idea → MP4</h2>
       </motion.div>
       <div className="relative">
@@ -181,11 +183,11 @@ function QuestMap() {
               transition={{ delay: i * 0.12, type: "spring", stiffness: 260, damping: 22 }} className="flex flex-col items-center text-center">
               <div className={cx("px-box relative mb-6 flex size-28 items-center justify-center", q.tint, q.status === "soon" && "opacity-60 grayscale-[0.4]")}>
                 <Sprite name={q.sprite} scale={4} className={q.status === "ready" ? "animate-bob" : undefined} />
-                <span className="px-box-flat absolute -top-3 -right-3 bg-ink px-2 py-1.5"><ArcadeLabel className="text-yellow">LV{q.level}</ArcadeLabel></span>
+                <span className="px-box-flat absolute -top-3 -right-3 bg-ink px-2 py-1.5"><ArcadeLabel className="text-yellow-ink">LV{q.level}</ArcadeLabel></span>
               </div>
               <h3 className="font-display text-2xl font-bold">{q.title}</h3>
               <p className="mt-2 max-w-[15rem] text-sm text-mute">{q.body}</p>
-              <span className={cx("mt-3 px-2 py-1.5", q.status === "ready" ? "bg-mint/15 text-mint" : "bg-raised text-mute")}>
+              <span className={cx("mt-3 px-2 py-1.5", q.status === "ready" ? "bg-mint/15 text-mint-ink" : "bg-raised text-mute")}>
                 <ArcadeLabel>{q.status === "ready" ? "Unlocked" : "Coming soon"}</ArcadeLabel>
               </span>
             </motion.li>
@@ -216,6 +218,7 @@ export function Dashboard() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState<TemplateId | null>(null);
+  const ocean = useOceanPhase();
 
   useEffect(() => {
     api.listProjects().then((r) => setProjects(r.projects)).catch((e) => setError(e.message));
@@ -241,15 +244,19 @@ export function Dashboard() {
             <a href="#projects" className="hover:text-paper">Projects</a>
             <a href="#templates" className="hover:text-paper">Templates</a>
           </div>
-          <Button variant="primary" className="ml-auto" onClick={() => setCreating("launch")}>
+          <ThemeToggle className="ml-auto" />
+          <Button variant="primary" onClick={() => setCreating("launch")}>
             <Plus className="size-4" /> New project
           </Button>
         </div>
       </nav>
 
       {/* Hero */}
-      <header className="relative flex h-[min(86vh,720px)] min-h-[520px] flex-col items-center overflow-hidden">
-        <PixelOcean className="absolute inset-0 h-full w-full" />
+      <header data-theme="dark" className="relative flex h-[min(86vh,720px)] min-h-[520px] flex-col items-center overflow-hidden">
+        <PixelOcean className="absolute inset-0 h-full w-full" palette={ocean.palette} />
+        <div className="absolute top-5 right-5 z-20">
+          <PhaseButton phase={ocean.phase} mode={ocean.mode} onClick={ocean.cycle} />
+        </div>
         <div className="relative z-10 flex flex-col items-center px-6 pt-[11vh] text-center">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
             <ArcadeLabel className="text-[12px] text-paper">Dive in to</ArcadeLabel>
@@ -260,23 +267,23 @@ export function Dashboard() {
             transition={{ type: "spring", stiffness: 220, damping: 16, delay: 0.1 }}
             className="px-text-shadow mt-5 font-display text-6xl leading-[0.95] font-bold sm:text-7xl lg:text-8xl"
           >
-            <span className="text-yellow">Forge Your</span>
+            <span className="text-yellow-ink">Forge Your</span>
             <br />
-            <span className="text-coral">Video Story</span>
+            <span className="text-coral-ink">Video Story</span>
           </motion.h1>
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="px-text-shadow mt-6 max-w-lg text-lg font-semibold">
             Animate scenes, turn data into motion, and export real MP4s — frame by frame.
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }} className="mt-8 flex gap-4">
             <Button variant="primary" className="h-12 px-6 text-lg" onClick={() => setCreating("launch")}>Get started</Button>
-            <a href="#quest" className="px-btn inline-flex h-12 items-center gap-2 bg-raised px-5 font-display text-lg font-semibold [--px-c:#010f17]">
+            <a href="#quest" className="px-btn inline-flex h-12 items-center gap-2 bg-raised px-5 font-display text-lg font-semibold [--px-c:var(--color-edge)]">
               How it works <ChevronDown className="size-4" />
             </a>
           </motion.div>
         </div>
         <motion.div initial={{ x: -40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.8, type: "spring" }} className="absolute bottom-[9%] left-[12%] z-10 hidden md:block">
           <div className="relative">
-            <div className="px-box-flat absolute -top-11 left-16 bg-paper px-3 py-2 whitespace-nowrap text-ink [--px-c:#010f17]">
+            <div className="px-box-flat absolute -top-11 left-16 bg-paper px-3 py-2 whitespace-nowrap text-onaccent [--px-c:var(--color-edge)]">
               <ArcadeLabel>Ready to render!</ArcadeLabel>
             </div>
             <Sprite name="bot" scale={5} className="animate-bob" />
@@ -289,12 +296,12 @@ export function Dashboard() {
       <main id="projects" className="mx-auto max-w-6xl scroll-mt-20 px-6 pb-20">
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
-            <ArcadeLabel className="text-aqua">Continue</ArcadeLabel>
+            <ArcadeLabel className="text-aqua-ink">Continue</ArcadeLabel>
             <h2 className="px-text-shadow mt-3 font-display text-4xl font-bold">Your save files</h2>
           </div>
           {projects && projects.length > 0 && <p className="text-sm text-mute">Hover a card to play its first scene.</p>}
         </div>
-        {error && <p className="px-box-flat mb-6 bg-coral/10 p-3 text-sm text-coral [--px-c:var(--color-coral)]">{error}</p>}
+        {error && <p className="px-box-flat mb-6 bg-coral/10 p-3 text-sm text-coral-ink [--px-c:var(--color-coral)]">{error}</p>}
         {projects === null && !error && (
           <ul className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
             {[0, 1, 2].map((i) => <li key={i} className="px-box h-72 animate-pulse bg-night" />)}
@@ -318,7 +325,7 @@ export function Dashboard() {
       </main>
 
       <section id="templates" className="mx-auto max-w-6xl scroll-mt-20 px-6 pb-24">
-        <ArcadeLabel className="text-aqua">New game</ArcadeLabel>
+        <ArcadeLabel className="text-aqua-ink">New game</ArcadeLabel>
         <h2 className="px-text-shadow mt-3 mb-8 font-display text-4xl font-bold">Choose a starting level</h2>
         <div className="grid gap-8 sm:grid-cols-2">
           {(
@@ -331,7 +338,7 @@ export function Dashboard() {
               transition={{ delay: i * 0.1 }} className="px-box group bg-night text-left transition-transform hover:-translate-y-1.5 hover:[--px-c:var(--color-aqua)] motion-reduce:hover:translate-y-0">
               <div className="border-b-[3px] border-line"><TemplateArt template={id} /></div>
               <div className="flex items-center gap-4 p-5">
-                <span className={cx("px-box-flat flex size-12 shrink-0 items-center justify-center [--px-c:#010f17]", tint)}>
+                <span className={cx("px-box-flat flex size-12 shrink-0 items-center justify-center [--px-c:var(--color-edge)]", tint)}>
                   <Sprite name={id === "launch" ? "clapper" : "monitor"} scale={2} />
                 </span>
                 <span>
@@ -361,7 +368,7 @@ export function Dashboard() {
               <div className="mb-6 flex items-center gap-3">
                 <Sprite name="clapper" scale={3} />
                 <div>
-                  <ArcadeLabel className="text-aqua">New game</ArcadeLabel>
+                  <ArcadeLabel className="text-aqua-ink">New game</ArcadeLabel>
                   <h2 className="mt-1.5 font-display text-3xl font-bold">New project</h2>
                 </div>
               </div>

@@ -161,6 +161,24 @@ export const SPRITES = {
     "yy...yy",
   ],
   bubble: [".w.", "w.w", ".w."],
+  sun: [
+    "...y...",
+    ".y.y.y.",
+    "..yyy..",
+    "yyyYyyy",
+    "..yyy..",
+    ".y.y.y.",
+    "...y...",
+  ],
+  moon: [
+    "..www..",
+    ".wwg...",
+    "wwg....",
+    "wwg....",
+    "wwg....",
+    ".wwg...",
+    "..www..",
+  ],
 } as const;
 
 export type SpriteName = keyof typeof SPRITES;
