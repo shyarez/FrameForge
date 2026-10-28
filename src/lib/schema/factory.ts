@@ -16,14 +16,14 @@ import { CANVAS_SIZES, SCHEMA_VERSION } from "./project";
 export const newId = (prefix: string) => `${prefix}_${nanoid(10)}`;
 
 export const PALETTE = {
-  ink: "#0f0e2a",
-  night: "#17163a",
-  lavender: "#b8a4ff",
-  blue: "#4d7cff",
-  coral: "#ff6b6b",
+  ink: "#031a24",
+  night: "#062b38",
+  aqua: "#4ff0d0",
+  blue: "#38a6ff",
+  coral: "#ff77a8",
   yellow: "#ffd166",
-  mint: "#5ee6b5",
-  paper: "#f7f4ff",
+  mint: "#7be495",
+  paper: "#effffb",
 } as const;
 
 export const anim = (
@@ -65,7 +65,7 @@ export function createShape(partial: Partial<ShapeElement> = {}): ShapeElement {
     ...base("Shape", 200, 200, 360, 360),
     type: "shape",
     shape: "rect",
-    fill: PALETTE.lavender,
+    fill: PALETTE.aqua,
     radius: 32,
     strokeWidth: 0,
     enter: anim("pop", 0, 700),
@@ -96,7 +96,7 @@ export function createChart(partial: Partial<ChartElement> = {}): ChartElement {
       { label: "C", value: 7 },
       { label: "D", value: 15 },
     ],
-    colors: [PALETTE.lavender, PALETTE.blue, PALETTE.coral, PALETTE.yellow],
+    colors: [PALETTE.aqua, PALETTE.blue, PALETTE.coral, PALETTE.yellow],
     textColor: PALETTE.paper,
     showValues: true,
     enter: anim("fade", 200, 1200, "easeOut"),
@@ -147,7 +147,7 @@ function launchScenes(aspect: AspectRatio): Scene[] {
         createShape({ name: "Sun", shape: "ellipse", fill: PALETTE.yellow, x: width - pad - 320, y: pad, width: 320, height: 320, enter: anim("pop", 100, 800) }),
         createShape({ name: "Block", fill: PALETTE.coral, x: pad, y: height - pad - 120, width: 240, height: 120, radius: 60, enter: anim("slide-left", 400, 700) }),
         createText({ name: "Headline", text: "Make something\nthat moves.", x: pad, y: Math.round(height * 0.32), width: textW, height: 300, fontSize: 128, lineHeight: 1.0, enter: anim("slide-up", 200, 800) }),
-        createText({ name: "Subtitle", text: "Built with FrameForge Studio", fontFamily: "sans", fontWeight: 500, fontSize: 44, color: PALETTE.lavender, x: pad, y: Math.round(height * 0.32) + 320, width: textW, height: 70, enter: anim("fade", 700, 700) }),
+        createText({ name: "Subtitle", text: "Built with FrameForge Studio", fontFamily: "sans", fontWeight: 500, fontSize: 44, color: PALETTE.aqua, x: pad, y: Math.round(height * 0.32) + 320, width: textW, height: 70, enter: anim("fade", 700, 700) }),
       ],
     }),
     createScene("Chart", {

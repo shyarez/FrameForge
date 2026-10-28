@@ -1,12 +1,13 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { AlertTriangle, CheckCircle2, Download, Film, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/client/api";
 import type { ExportJob } from "@/lib/server/exportJobs";
 import { outputSize, projectDurationMs } from "@/lib/schema/project";
-import { Button, Field, IconButton, Select } from "@/components/ui/primitives";
+import { ArcadeLabel, Button, Field, IconButton, PixelProgress, Select } from "@/components/ui/primitives";
+import { Sprite } from "@/components/pixel/Sprite";
 import { useEditor } from "@/store/editor";
 
 const STATUS_LABEL: Record<ExportJob["status"], string> = {
@@ -65,18 +66,21 @@ export function ExportDialog({ open, onClose, save }: { open: boolean; onClose: 
   return (
     <AnimatePresence>
       {open && (
-        <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-4 backdrop-blur-[2px]"
+        <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
           <motion.div role="dialog" aria-modal="true" aria-labelledby="export-title"
-            className="w-full max-w-lg rounded-3xl border-2 border-line bg-panel p-6 shadow-[0_8px_0_0_#0a0920]"
-            initial={{ y: 24, scale: 0.97 }} animate={{ y: 0, scale: 1 }} exit={{ y: 24, scale: 0.97 }} transition={{ type: "spring", stiffness: 380, damping: 30 }}>
-            <div className="mb-5 flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <span className="flex size-10 items-center justify-center rounded-2xl bg-coral text-ink"><Film className="size-5" /></span>
+            className="px-box w-full max-w-lg bg-panel p-7"
+            initial={{ y: 30, scale: 0.9 }} animate={{ y: 0, scale: 1 }} exit={{ y: 30, scale: 0.9 }} transition={{ type: "spring", stiffness: 400, damping: 24 }}>
+            <div className="mb-6 flex items-start justify-between">
+              <div className="flex items-center gap-4">
+                <span className="px-box-flat flex size-14 items-center justify-center bg-coral [--px-c:#010f17]">
+                  <Sprite name="reel" scale={3} className={busy ? "animate-spin-steps" : undefined} />
+                </span>
                 <div>
-                  <h2 id="export-title" className="font-display text-xl font-bold">Export MP4</h2>
-                  <p className="text-xs text-mute">{size.width}×{size.height} · {settings.fps} fps · {(projectDurationMs(project) / 1000).toFixed(1)}s · H.264</p>
+                  <ArcadeLabel className="text-aqua">Final level</ArcadeLabel>
+                  <h2 id="export-title" className="mt-1.5 font-display text-2xl font-bold">Export MP4</h2>
+                  <p className="mt-0.5 font-mono text-[11px] text-mute">{size.width}×{size.height} · {settings.fps} fps · {(projectDurationMs(project) / 1000).toFixed(1)}s · H.264</p>
                 </div>
               </div>
               <IconButton label="Close" onClick={onClose} disabled={busy}><X className="size-4" /></IconButton>
@@ -100,9 +104,9 @@ export function ExportDialog({ open, onClose, save }: { open: boolean; onClose: 
             </div>
 
             {job && (
-              <div className="mb-5 rounded-2xl bg-night p-4" aria-live="polite">
-                <div className="mb-2 flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2">
+              <div className="px-box-flat mb-6 bg-night p-4" aria-live="polite">
+                <div className="mb-3 flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2 font-display text-[15px] font-semibold">
                     {job.status === "done" && <CheckCircle2 className="size-4 text-mint" />}
                     {job.status === "error" && <AlertTriangle className="size-4 text-coral" />}
                     {STATUS_LABEL[job.status]}
@@ -111,14 +115,17 @@ export function ExportDialog({ open, onClose, save }: { open: boolean; onClose: 
                     {job.totalFrames ? `${job.frame}/${job.totalFrames}` : ""} {elapsed && `· ${elapsed}s`}
                   </span>
                 </div>
-                <div className="h-3 overflow-hidden rounded-full bg-raised" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-                  <div className={`h-full rounded-full transition-[width] duration-300 ${job.status === "error" ? "bg-coral" : job.status === "done" ? "bg-mint" : "bg-yellow"}`}
-                    style={{ width: `${job.status === "done" ? 100 : pct}%` }} />
-                </div>
+                <PixelProgress value={job.status === "done" ? 1 : pct / 100} color={job.status === "error" ? "bg-coral" : job.status === "done" ? "bg-mint" : "bg-yellow"} />
                 {job.status === "error" && <p className="mt-3 text-xs break-words text-coral">{job.error}</p>}
                 {job.status === "done" && job.probe && (
                   <>
-                    <video key={job.id} src={api.exportFileUrl(job.id)} controls className="mt-4 w-full rounded-xl bg-black" />
+                    <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 500, damping: 14 }}
+                      className="mt-4 flex items-center justify-center gap-3">
+                      <Sprite name="star" scale={3} className="animate-twinkle" />
+                      <ArcadeLabel className="text-[11px] text-yellow">Level clear!</ArcadeLabel>
+                      <Sprite name="star" scale={3} className="animate-twinkle [animation-delay:0.6s]" />
+                    </motion.div>
+                    <video key={job.id} src={api.exportFileUrl(job.id)} controls className="px-box-flat mt-4 w-full bg-black" />
                     <p className="mt-2 font-mono text-[11px] text-mute">
                       Verified: {job.probe.codec} {job.probe.width}×{job.probe.height} @ {job.probe.fps}fps, {job.probe.durationSec.toFixed(2)}s, decoded without errors
                     </p>
@@ -126,11 +133,11 @@ export function ExportDialog({ open, onClose, save }: { open: boolean; onClose: 
                 )}
               </div>
             )}
-            {error && <p className="mb-4 rounded-xl bg-coral/10 p-3 text-xs text-coral">{error}</p>}
+            {error && <p className="px-box-flat mb-4 bg-coral/10 p-3 text-xs text-coral [--px-c:var(--color-coral)]">{error}</p>}
 
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-4">
               {job?.status === "done" && (
-                <a href={api.exportFileUrl(job.id, true)} className="btn-press inline-flex h-9 items-center gap-2 rounded-xl bg-mint px-3 text-sm font-semibold text-ink">
+                <a href={api.exportFileUrl(job.id, true)} className="px-btn inline-flex h-9 items-center gap-2 bg-mint px-3.5 font-display text-[15px] font-semibold text-ink">
                   <Download className="size-4" /> Download
                 </a>
               )}

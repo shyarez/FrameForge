@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/client/api";
 import { projectDurationMs } from "@/lib/schema/project";
-import { Logo } from "@/components/brand/Logo";
+import { Sprite } from "@/components/pixel/Sprite";
+import { ArcadeLabel } from "@/components/ui/primitives";
 import { useEditor } from "@/store/editor";
 import { CanvasStage } from "./CanvasStage";
 import { ExportDialog } from "./ExportDialog";
@@ -146,19 +147,21 @@ export function EditorApp({ projectId }: { projectId: string }) {
   if (loadError) {
     return (
       <main className="bg-dots flex h-screen flex-col items-center justify-center gap-4 text-center">
-        <Logo className="size-14" />
-        <h1 className="font-display text-2xl font-bold">Couldn&apos;t open this project</h1>
+        <Sprite name="bot" scale={5} />
+        <ArcadeLabel className="text-coral">Game over</ArcadeLabel>
+        <h1 className="font-display text-3xl font-bold">Couldn&apos;t open this project</h1>
         <p className="text-sm text-mute">{loadError}</p>
-        <Link href="/" className="btn-press rounded-xl bg-yellow px-4 py-2 text-sm font-semibold text-ink">Back to projects</Link>
+        <Link href="/" className="px-btn mt-2 bg-yellow px-4 py-2 font-display font-semibold text-ink">Back to projects</Link>
       </main>
     );
   }
   if (!project || project.id !== projectId) {
     return (
-      <main className="flex h-screen items-center justify-center" aria-busy="true">
-        <div className="flex items-center gap-3 text-mute">
-          <Logo className="size-8 animate-bounce motion-reduce:animate-none" /> Loading editor…
-        </div>
+      <main className="bg-dots flex h-screen flex-col items-center justify-center gap-5" aria-busy="true">
+        <Sprite name="bot" scale={5} className="animate-bob" />
+        <ArcadeLabel className="text-aqua">
+          Loading level<span className="ff-blink">_</span>
+        </ArcadeLabel>
       </main>
     );
   }

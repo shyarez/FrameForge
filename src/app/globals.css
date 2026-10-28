@@ -1,26 +1,29 @@
 @import "tailwindcss";
 
-/* FrameForge palette: deep night base with lavender / electric blue / coral / warm yellow accents. */
+/* FrameForge "deep sea" palette: abyss-teal base with aquamarine, sea blue, coral pink, seafoam green and sand yellow accents. */
 @theme {
-  --color-ink: #0f0e2a;
-  --color-night: #161538;
-  --color-panel: #1c1a45;
-  --color-raised: #252257;
-  --color-line: #34307a;
-  --color-mute: #8f8bc4;
-  --color-paper: #f7f4ff;
-  --color-lavender: #b8a4ff;
-  --color-blue: #4d7cff;
-  --color-coral: #ff6b6b;
+  --color-ink: #031a24;
+  --color-night: #05242f;
+  --color-panel: #082f3c;
+  --color-raised: #0e4351;
+  --color-line: #186571;
+  --color-mute: #8cc4c4;
+  --color-paper: #effffb;
+  --color-aqua: #4ff0d0;
+  --color-blue: #38a6ff;
+  --color-coral: #ff77a8;
   --color-yellow: #ffd166;
-  --color-mint: #5ee6b5;
+  --color-mint: #7be495;
 
-  --font-display: var(--ff-display), system-ui, sans-serif;
+  /* UI headings are pixel type; video text keeps its own stacks (see SceneView FONT_STACKS). */
+  --font-display: var(--ff-pixel), system-ui, sans-serif;
+  --font-arcade: var(--ff-arcade), ui-monospace, monospace;
   --font-sans: var(--ff-ui), system-ui, sans-serif;
   --font-mono: var(--ff-code), ui-monospace, monospace;
 
-  --shadow-chunky: 0 4px 0 0 #0a0920;
-  --shadow-chunky-sm: 0 2px 0 0 #0a0920;
+  --animate-twinkle: ff-twinkle 2.4s steps(3) infinite;
+  --animate-bob: ff-bob 1.2s steps(2) infinite;
+  --animate-spin-steps: ff-spin 1.2s steps(8) infinite;
 }
 
 html {
@@ -33,26 +36,165 @@ body {
   font-family: var(--font-sans);
 }
 
-/* Subtle dotted texture used on large surfaces. */
-.bg-dots {
-  background-image: radial-gradient(rgb(184 164 255 / 0.12) 1px, transparent 1px);
-  background-size: 22px 22px;
+/* ---------- Pixel UI kit ---------- */
+
+/* Pixel-art surfaces: crisp scaling for sprites and scenes. */
+.pixelated {
+  image-rendering: pixelated;
+  shape-rendering: crispEdges;
 }
 
-/* Tactile "pressable" buttons: they sit on a hard shadow and sink when pressed. */
+/*
+ * Notched pixel border: four hard shadows draw the edges and leave the corners empty,
+ * the classic 8-bit box. --px-c sets the border colour, --px-s the drop shadow.
+ */
+.px-box {
+  --px-c: var(--color-line);
+  --px-s: #010f17;
+  box-shadow:
+    -3px 0 0 0 var(--px-c),
+    3px 0 0 0 var(--px-c),
+    0 -3px 0 0 var(--px-c),
+    0 3px 0 0 var(--px-c),
+    0 9px 0 -3px var(--px-s);
+}
+.px-box-flat {
+  --px-c: var(--color-line);
+  box-shadow:
+    -2px 0 0 0 var(--px-c),
+    2px 0 0 0 var(--px-c),
+    0 -2px 0 0 var(--px-c),
+    0 2px 0 0 var(--px-c);
+}
+
+/* Chunky arcade buttons with bevel shading that sink when pressed. */
+.px-btn {
+  --px-c: var(--color-ink);
+  --px-shade: rgb(0 0 0 / 0.28);
+  --px-light: rgb(255 255 255 / 0.35);
+  position: relative;
+  box-shadow:
+    inset -3px -3px 0 0 var(--px-shade),
+    inset 3px 3px 0 0 var(--px-light),
+    -3px 0 0 0 var(--px-c),
+    3px 0 0 0 var(--px-c),
+    0 -3px 0 0 var(--px-c),
+    0 3px 0 0 var(--px-c),
+    0 7px 0 -1px #010f17;
+  transition: transform 60ms steps(1), filter 120ms;
+}
+.px-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.px-btn:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow:
+    inset 3px 3px 0 0 var(--px-shade),
+    -3px 0 0 0 var(--px-c),
+    3px 0 0 0 var(--px-c),
+    0 -3px 0 0 var(--px-c),
+    0 3px 0 0 var(--px-c);
+}
+
+/* Legacy soft press used by small icon buttons. */
 .btn-press {
-  box-shadow: var(--shadow-chunky-sm);
-  transition: transform 80ms ease, box-shadow 80ms ease, background-color 120ms ease;
+  transition: transform 60ms steps(1);
 }
 .btn-press:active:not(:disabled) {
   transform: translateY(2px);
-  box-shadow: none;
+}
+
+/* Subtle pixel-grid texture for large surfaces. */
+.bg-dots {
+  background-image:
+    linear-gradient(rgb(79 240 208 / 0.05) 2px, transparent 2px),
+    linear-gradient(90deg, rgb(79 240 208 / 0.05) 2px, transparent 2px);
+  background-size: 24px 24px;
+}
+
+/* Pixel text shadow for big headings. */
+.px-text-shadow {
+  text-shadow:
+    3px 3px 0 #010f17,
+    -1px -1px 0 #010f17,
+    1px -1px 0 #010f17,
+    -1px 1px 0 #010f17;
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-yellow);
-  outline-offset: 2px;
+  outline: 3px solid var(--color-yellow);
+  outline-offset: 3px;
 }
+
+/* ---------- Keyframes (stepped, to feel like sprite animation) ---------- */
+
+@keyframes ff-twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+@keyframes ff-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+@keyframes ff-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes ff-drift {
+  from { transform: translateX(-90px); }
+  to { transform: translateX(420px); }
+}
+@keyframes ff-firefly {
+  0%, 100% { transform: translate(0, 0); opacity: 0.2; }
+  25% { opacity: 1; }
+  50% { transform: translate(6px, -8px); opacity: 0.9; }
+  75% { opacity: 0.3; }
+}
+@keyframes ff-bar {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+@keyframes ff-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* Underwater scene */
+@keyframes ff-swim-l {
+  from { transform: translateX(340px); }
+  to { transform: translateX(-70px); }
+}
+@keyframes ff-swim-r {
+  from { transform: translateX(-70px); }
+  to { transform: translateX(340px); }
+}
+@keyframes ff-rise {
+  0% { transform: translateY(0); opacity: 0; }
+  10% { opacity: 1; }
+  85% { opacity: 0.9; }
+  100% { transform: translateY(-128px); opacity: 0; }
+}
+@keyframes ff-jelly {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+@keyframes ff-ray {
+  0%, 100% { opacity: 0.05; }
+  50% { opacity: 0.13; }
+}
+
+.ff-swim-l { animation: ff-swim-l linear infinite; }
+.ff-swim-r { animation: ff-swim-r linear infinite; }
+.ff-rise { animation: ff-rise steps(32) infinite; }
+.ff-jelly { animation: ff-jelly 4s steps(7) infinite; }
+.ff-ray { animation: ff-ray 5s steps(5) infinite; }
+/* Two-frame sway: frames A and B alternate like a sprite sheet. */
+.ff-sway-a { animation: ff-blink 1.8s steps(1) infinite; }
+.ff-sway-b { animation: ff-blink 1.8s steps(1) infinite; animation-delay: -0.9s; }
+
+.ff-drift { animation: ff-drift linear infinite; }
+.ff-firefly { animation: ff-firefly 3.6s steps(6) infinite; transform-box: fill-box; }
+.ff-bar { animation: ff-bar 1.6s steps(5) infinite; transform-box: fill-box; transform-origin: bottom; }
+.ff-blink { animation: ff-blink 1s steps(1) infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -62,6 +204,38 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  /* With animation off, show a single still frame of each two-frame sprite. */
+  .ff-sway-b {
+    display: none;
+  }
+}
+
+/* Pixel scrubber: square track and a chunky block thumb. */
+.px-range {
+  appearance: none;
+  height: 10px;
+  cursor: pointer;
+  background: var(--color-ink);
+  box-shadow:
+    -2px 0 0 0 var(--color-line),
+    2px 0 0 0 var(--color-line),
+    0 -2px 0 0 var(--color-line),
+    0 2px 0 0 var(--color-line);
+}
+.px-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 20px;
+  background: var(--color-yellow);
+  box-shadow: inset -3px -3px 0 0 #d9a23a, 0 0 0 2px var(--color-ink);
+}
+.px-range::-moz-range-thumb {
+  width: 14px;
+  height: 20px;
+  border: 0;
+  border-radius: 0;
+  background: var(--color-yellow);
+  box-shadow: inset -3px -3px 0 0 #d9a23a, 0 0 0 2px var(--color-ink);
 }
 
 /* Thin scrollbars for dense editor panels. */

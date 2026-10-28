@@ -22,7 +22,7 @@ function SceneThumb({ project, scene }: { project: Project; scene: Scene }) {
     [scene],
   );
   return (
-    <div className="shrink-0 overflow-hidden rounded-md" style={{ width: logical.width * scale, height: h }}>
+    <div className="shrink-0 overflow-hidden" style={{ width: logical.width * scale, height: h }}>
       <div style={{ transform: `scale(${scale})`, transformOrigin: "0 0" }}>
         <SceneView state={state} width={logical.width} height={logical.height} projectId={project.id} />
       </div>
@@ -39,14 +39,14 @@ export function PlaybackBar() {
   const sceneIndex = evaluateProject(project, timeMs).sceneIndex;
 
   return (
-    <div className="flex h-12 shrink-0 items-center gap-2 border-t border-line bg-panel px-3">
+    <div className="flex h-14 shrink-0 items-center gap-3 border-t-[3px] border-line bg-panel px-4">
       <IconButton label="Back to start" onClick={() => setTime(0)}>
         <SkipBack className="size-4" />
       </IconButton>
       <button
         onClick={() => setPlaying(!playing)}
         aria-label={playing ? "Pause" : "Play"}
-        className="btn-press inline-flex size-9 items-center justify-center rounded-full bg-lavender text-ink hover:bg-[#cbbcff]"
+        className="px-btn inline-flex size-9 items-center justify-center bg-aqua text-ink"
       >
         {playing ? <Pause className="size-4" fill="currentColor" /> : <Play className="ml-0.5 size-4" fill="currentColor" />}
       </button>
@@ -64,9 +64,9 @@ export function PlaybackBar() {
           setPlaying(false);
           setTime(Number(e.target.value));
         }}
-        className="h-1 flex-1 cursor-pointer accent-yellow"
+        className="px-range flex-1"
       />
-      <span className="w-24 text-right text-xs text-mute">
+      <span className="w-28 text-right font-arcade text-[9px] text-mute uppercase">
         Scene {sceneIndex + 1} / {project.scenes.length}
       </span>
     </div>
@@ -86,9 +86,9 @@ export function Timeline() {
   const selIdx = project.scenes.findIndex((s) => s.id === selectedSceneId);
 
   return (
-    <div className="flex h-36 shrink-0 flex-col border-t border-line bg-night">
-      <div className="flex h-9 items-center gap-1 px-3">
-        <span className="mr-2 font-display text-sm font-semibold">Scenes</span>
+    <div className="flex h-40 shrink-0 flex-col border-t-[3px] border-line bg-night">
+      <div className="flex h-10 items-center gap-1 px-4">
+        <span className="mr-3 font-arcade text-[10px] tracking-wider text-yellow uppercase">Scenes</span>
         <IconButton label="Add scene after selected" onClick={addScene}>
           <Plus className="size-4" />
         </IconButton>
@@ -110,11 +110,11 @@ export function Timeline() {
           <Trash2 className="size-4" />
         </IconButton>
       </div>
-      <div className="scroll-thin relative flex-1 overflow-x-auto overflow-y-hidden px-3 pb-3">
+      <div className="scroll-thin relative flex-1 overflow-x-auto overflow-y-hidden px-4 pt-1 pb-3">
         <div
           ref={trackRef}
-          className="relative flex h-full gap-1"
-          style={{ width: Math.max(total * pxPerMs, 100) + project.scenes.length * 4 }}
+          className="relative flex h-full gap-1.5"
+          style={{ width: Math.max(total * pxPerMs, 100) + project.scenes.length * 6 }}
           onPointerDown={(e) => {
             // Clicking the empty ruler area seeks.
             if (e.target !== e.currentTarget || !trackRef.current) return;
@@ -128,29 +128,29 @@ export function Timeline() {
               key={scene.id}
               onClick={() => selectScene(scene.id)}
               className={cx(
-                "group relative flex h-full shrink-0 flex-col gap-1 overflow-hidden rounded-xl border-2 p-1.5 text-left transition-colors",
-                scene.id === selectedSceneId ? "border-yellow bg-raised" : "border-line bg-panel hover:border-lavender/60",
+                "px-box-flat group relative flex h-full shrink-0 flex-col gap-1 overflow-hidden p-1.5 text-left transition-colors",
+                scene.id === selectedSceneId ? "bg-raised [--px-c:var(--color-yellow)]" : "bg-panel hover:[--px-c:var(--color-aqua)]",
               )}
               style={{ width: scene.durationMs * pxPerMs }}
               aria-pressed={scene.id === selectedSceneId}
             >
               <div className="flex items-center justify-between gap-1 text-[11px]">
-                <span className="truncate font-medium">
+                <span className="truncate font-display text-[13px] font-semibold">
                   {i + 1}. {scene.name}
                 </span>
                 <span className="shrink-0 font-mono text-mute">{(scene.durationMs / 1000).toFixed(1)}s</span>
               </div>
               <SceneThumb project={project} scene={scene} />
               {scene.transition.type !== "none" && i > 0 && (
-                <span className="absolute top-0 left-0 h-1 bg-lavender/70" style={{ width: scene.transition.durationMs * pxPerMs }} title={`${scene.transition.type} transition`} />
+                <span className="absolute top-0 left-0 h-1 bg-aqua/70" style={{ width: scene.transition.durationMs * pxPerMs }} title={`${scene.transition.type} transition`} />
               )}
             </button>
           ))}
           <div
-            className="pointer-events-none absolute top-0 bottom-0 w-0.5 bg-coral"
-            style={{ left: timeMs * pxPerMs + (starts.findLastIndex((s) => s <= timeMs) || 0) * 4 }}
+            className="pointer-events-none absolute -top-1 bottom-0 w-[3px] bg-coral"
+            style={{ left: timeMs * pxPerMs + (starts.findLastIndex((s) => s <= timeMs) || 0) * 6 }}
           >
-            <div className="absolute -top-1 -left-1.5 size-3.5 rounded-full border-2 border-night bg-coral" />
+            <div className="absolute -top-1 -left-[5px] size-[13px] bg-coral [clip-path:polygon(0_0,100%_0,100%_60%,50%_100%,0_60%)]" />
           </div>
         </div>
       </div>

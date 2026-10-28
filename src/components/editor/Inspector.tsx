@@ -40,7 +40,7 @@ function CommitText({ value, onCommit, multiline, className, ...rest }: { value:
   if (multiline)
     return (
       <textarea {...rest} value={text} onChange={(e) => setText(e.target.value)} onBlur={commit}
-        className={`scroll-thin w-full rounded-lg border border-line bg-night p-2 text-sm text-paper outline-none focus:border-lavender ${className ?? ""}`} />
+        className={`scroll-thin px-box-flat w-full bg-ink p-2 text-sm text-paper outline-none focus:[--px-c:var(--color-aqua)] ${className ?? ""}`} />
     );
   return <TextInput {...rest} className={className} value={text} onChange={(e) => setText(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === "Enter" && commit()} />;
 }
@@ -48,7 +48,7 @@ function CommitText({ value, onCommit, multiline, className, ...rest }: { value:
 function ColorField({ label, value, onCommit }: { label: string; value: string; onCommit: (v: string) => void }) {
   return (
     <Field label={label}>
-      <div className="flex h-8 items-center gap-2 rounded-lg border border-line bg-night px-1.5">
+      <div className="px-box-flat flex h-8 items-center gap-2 bg-ink px-1.5">
         <input type="color" aria-label={label} value={value.slice(0, 7)} onChange={(e) => onCommit(e.target.value)} className="size-5 cursor-pointer rounded border-0 bg-transparent p-0" />
         <span className="font-mono text-xs text-mute">{value}</span>
       </div>
@@ -58,9 +58,12 @@ function ColorField({ label, value, onCommit }: { label: string; value: string; 
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="border-b border-line px-4 py-3">
-      <h3 className="mb-2.5 font-display text-xs font-semibold tracking-wide text-lavender uppercase">{title}</h3>
-      <div className="grid grid-cols-2 gap-2.5">{children}</div>
+    <section className="border-b-2 border-line px-4 py-4">
+      <h3 className="mb-3.5 flex items-center gap-2 font-display text-[15px] font-semibold text-aqua">
+        <span aria-hidden className="size-2 bg-aqua" />
+        {title}
+      </h3>
+      <div className="grid grid-cols-2 gap-3">{children}</div>
     </section>
   );
 }
@@ -108,7 +111,7 @@ function ChartDataEditor({ el, update }: { el: ChartElement; update: (p: Partial
   return (
     <Field label="Data (label, value per line)" className="col-span-2">
       <textarea value={text} onChange={(e) => setText(e.target.value)} onBlur={commit} rows={5}
-        className="scroll-thin w-full rounded-lg border border-line bg-night p-2 font-mono text-xs text-paper outline-none focus:border-lavender" />
+        className="scroll-thin px-box-flat w-full bg-ink p-2 font-mono text-xs text-paper outline-none focus:[--px-c:var(--color-aqua)]" />
     </Field>
   );
 }
@@ -120,7 +123,7 @@ function ElementInspector({ el }: { el: SceneElement }) {
 
   return (
     <>
-      <div className="flex items-center gap-1 border-b border-line px-4 py-3">
+      <div className="flex items-center gap-1 border-b-2 border-line px-4 py-3">
         <CommitText aria-label="Element name" value={el.name} onCommit={(name) => update({ name })} className="flex-1 font-medium" />
         <IconButton label="Bring forward" onClick={() => reorderElement(el.id, "forward")}><ArrowUp className="size-4" /></IconButton>
         <IconButton label="Send backward" onClick={() => reorderElement(el.id, "backward")}><ArrowDown className="size-4" /></IconButton>
@@ -137,6 +140,8 @@ function ElementInspector({ el }: { el: SceneElement }) {
               <option value="display">Display</option>
               <option value="sans">Sans</option>
               <option value="mono">Mono</option>
+              <option value="pixel">Pixel</option>
+              <option value="arcade">Arcade</option>
             </Select>
           </Field>
           <NumberField label="Size" value={el.fontSize} min={4} max={800} onCommit={(v) => styleUpdate({ fontSize: v })} />
@@ -167,7 +172,7 @@ function ElementInspector({ el }: { el: SceneElement }) {
           </Field>
           <ColorField label="Fill" value={el.fill} onCommit={(v) => styleUpdate({ fill: v })} />
           <NumberField label="Corner radius" value={el.radius} min={0} onCommit={(v) => styleUpdate({ radius: v })} />
-          <NumberField label="Stroke width" value={el.strokeWidth} min={0} onCommit={(v) => styleUpdate({ strokeWidth: v, stroke: el.stroke ?? "#f7f4ff" })} />
+          <NumberField label="Stroke width" value={el.strokeWidth} min={0} onCommit={(v) => styleUpdate({ strokeWidth: v, stroke: el.stroke ?? "#effffb" })} />
         </Section>
       )}
 
@@ -217,7 +222,7 @@ function SceneInspector({ scene, isFirst }: { scene: Scene; isFirst: boolean }) 
   const update = (patch: Partial<Scene>) => updateScene(scene.id, patch);
   return (
     <>
-      <div className="border-b border-line px-4 py-3">
+      <div className="border-b-2 border-line px-4 py-3">
         <p className="mb-1 text-[11px] text-mute uppercase">Scene</p>
         <CommitText aria-label="Scene name" value={scene.name} onCommit={(name) => update({ name })} className="font-medium" />
       </div>
@@ -249,9 +254,9 @@ export function Inspector() {
   const scene = findScene(project, selectedSceneId);
 
   return (
-    <aside className="scroll-thin flex w-72 shrink-0 flex-col overflow-y-auto border-l border-line bg-night" aria-label="Properties">
-      <div className="flex h-10 shrink-0 items-center justify-between border-b border-line px-4">
-        <h2 className="font-display text-sm font-semibold">{hit ? "Element" : "Properties"}</h2>
+    <aside className="scroll-thin flex w-72 shrink-0 flex-col overflow-y-auto border-l-[3px] border-line bg-night" aria-label="Properties">
+      <div className="flex h-11 shrink-0 items-center justify-between border-b-[3px] border-line bg-panel px-4">
+        <h2 className="font-arcade text-[10px] tracking-wider text-yellow uppercase">{hit ? "Element" : "Properties"}</h2>
         {hit && (
           <Button variant="ghost" className="h-7 px-2 text-xs" onClick={() => useEditor.getState().selectElement(null)}>
             Scene settings

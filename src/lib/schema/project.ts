@@ -38,7 +38,7 @@ export const AnimationSchema = z.object({
 });
 export type Animation = z.infer<typeof AnimationSchema>;
 
-export const FontFamilySchema = z.enum(["display", "sans", "mono"]);
+export const FontFamilySchema = z.enum(["display", "sans", "mono", "pixel", "arcade"]);
 export type FontFamily = z.infer<typeof FontFamilySchema>;
 
 const Color = z.string().regex(/^#[0-9a-fA-F]{3,8}$/, "Expected a hex color");

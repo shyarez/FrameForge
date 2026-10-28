@@ -116,7 +116,7 @@ export function CanvasStage() {
   return (
     <div ref={wrapRef} className="bg-dots relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
       <div
-        className="relative shrink-0 overflow-hidden rounded-md shadow-[0_0_0_1px_#34307a,0_20px_60px_-20px_#000]"
+        className="px-box relative shrink-0 overflow-hidden [--px-c:var(--color-raised)]"
         style={{ width: logical.width * scale, height: logical.height * scale }}
       >
         <div
@@ -157,7 +157,7 @@ export function CanvasStage() {
                     top: h.includes("n") ? -hs / 2 : undefined,
                     bottom: h.includes("s") ? -hs / 2 : undefined,
                     cursor: h === "nw" || h === "se" ? "nwse-resize" : "nesw-resize",
-                    boxShadow: `0 0 0 ${2 / scale}px #0f0e2a`,
+                    boxShadow: `0 0 0 ${2 / scale}px #031a24`,
                   }}
                 />
               ))}
@@ -166,7 +166,7 @@ export function CanvasStage() {
         </div>
       </div>
       {scene && scene.elements.length === 0 && !playing && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-6 text-center text-sm text-mute">
+        <div className="pointer-events-none absolute inset-x-0 bottom-6 text-center font-display text-[15px] text-mute">
           This scene is empty — add text, shapes or a chart from the left panel.
         </div>
       )}

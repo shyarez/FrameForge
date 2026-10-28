@@ -10,8 +10,10 @@ import { ChartGraphic } from "./ChartGraphic";
 
 export const FONT_STACKS = {
   display: "var(--ff-display), 'Bricolage Grotesque', system-ui, sans-serif",
-  sans: "var(--ff-ui), 'Geist', system-ui, sans-serif",
+  sans: "var(--ff-ui), 'Mulish', system-ui, sans-serif",
   mono: "var(--ff-code), 'Geist Mono', ui-monospace, monospace",
+  pixel: "var(--ff-pixel), 'Pixelify Sans', system-ui, sans-serif",
+  arcade: "var(--ff-arcade), 'Press Start 2P', ui-monospace, monospace",
 } as const;
 
 export function resolveAssetSrc(projectId: string, src: string): string {
@@ -61,8 +63,8 @@ function ElementBody({ el, reveal, projectId }: { el: SceneElement; reveal: numb
         <img src={src} alt={el.name} draggable={false}
           style={{ width: "100%", height: "100%", objectFit: el.fit, borderRadius: el.radius, display: "block" }} />
       ) : (
-        <div style={{ width: "100%", height: "100%", borderRadius: el.radius, border: "4px dashed #b8a4ff66",
-          display: "grid", placeItems: "center", color: "#b8a4ffaa", fontSize: 32, fontFamily: FONT_STACKS.sans }}>
+        <div style={{ width: "100%", height: "100%", borderRadius: el.radius, border: "4px dashed #4ff0d066",
+          display: "grid", placeItems: "center", color: "#4ff0d0aa", fontSize: 32, fontFamily: FONT_STACKS.sans }}>
           No image
         </div>
       );

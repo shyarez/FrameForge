@@ -43,3 +43,14 @@ FF_BASE_URL=http://localhost:3000 npm run test:e2e   # browser e2e (app must be 
 ```
 
 Env overrides: `FF_CHROME_PATH`, `FF_FFMPEG_PATH`, `FF_DATA_DIR`.
+
+## UI refresh — pixel theme (ocean palette)
+
+- Design language studied from the Codédex reference (pixel display type, layered pixel landscape, yellow arcade buttons, bordered cards). All artwork is **original**: no Codédex logos, characters or illustrations are used.
+- Fonts (Google Fonts, OFL): Pixelify Sans (headings), Press Start 2P (labels and chips), Mulish (body).
+- `src/components/pixel/`: sprite system (`sprites.ts` grids → crisp SVG via `Sprite.tsx`), procedural `PixelOcean` hero (seeded, with parallax, two-frame swaying seagrass and kelp, coral, rising bubbles, schools of fish in both directions, jellyfish, light rays, and a sunken TV playing a looping chart); `FishCursor` pixel-fish cursors.
+- Pixel UI kit in `globals.css`: `.px-box` notched borders, `.px-btn` bevelled press buttons, `.px-range` scrubber, stepped keyframes. All animation respects `prefers-reduced-motion`.
+- Dashboard: hero, quest map (Data story is honestly marked "Coming soon"), save-file project cards with hover playback, template cards.
+- Editor: same layout and density, with the pixel styling applied; export dialog has a spinning reel sprite and a segmented progress bar.
+- New video text fonts: `pixel` and `arcade` (schema enum extended; existing projects remain valid).
+- Verified: typecheck and lint clean; 23 unit tests (sprite grid validation added); 6/6 browser e2e tests pass, including a real UI export.
