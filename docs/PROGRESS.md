@@ -80,3 +80,30 @@ Env overrides: `FF_CHROME_PATH`, `FF_FFMPEG_PATH`, `FF_DATA_DIR`.
 Totals: 80 unit tests, 13 browser e2e tests (Day 1 + Day 2), typecheck and lint clean.
 
 **Next (Day 3):** CSV import and preview, column typing and missing values, deterministic statistics, animated chart scenes, editable story generation.
+
+## Day 3 — status: done
+
+**Pipeline** (`src/lib/data/`, all pure and deterministic):
+`csv.ts` validate/parse → `profile.ts` column typing → `stats.ts` serialisable `CalcSpec` calculations → `story.ts` scene generation → `binding.ts` evidence-bound text.
+
+| Feature | Verified by |
+|---|---|
+| CSV validation: 5 MB / 50k rows / 100 cols; empty, header-only and binary rejected; BOM/CRLF normalised; blank/duplicate headers renamed; ragged rows padded with a warning | unit + e2e (header-only CSV rejected in UI) |
+| Column typing: numeric (handles `1,234.5`, `$12`, `45%`), strict dates, categorical, text; missing-value placeholders; id and time-column detection | unit |
+| Statistics: row count, sum/mean/count/min/max, group-by, top-group share, trend with day→month→year bucketing, trend change, histogram | unit (hand-computed expected values) |
+| Story generation: intro → key metric → comparison → trend *or* distribution → summary, including only scenes the data supports, with skip reasons | unit (3 dataset shapes) + e2e |
+| Evidence: each claim stores dataset id, version, sha256, calculation spec, result, format and dependent scene ids | unit + e2e recomputes every claim independently from the CSV |
+| No invented numbers: narrative templates contain no digits; every number is a `{n}` token filled from evidence | unit |
+| Count-up animation for the key metric, computed in the pure evaluator (same in preview and export) | unit |
+| Datasets tab, preview dialog (typed column chips, missing counts, 25-row table), role pickers, storyboard plan, insert as editable scenes | e2e + screenshots |
+| Evidence section in the inspector (calculation, value, dataset version, linked scenes) | e2e |
+| Editing bound text by hand unlinks it, with a visible note | manual |
+| Generated story exports to a verified MP4 (31 s, full decode) | e2e |
+
+**AI narration:** not enabled. No `ANTHROPIC_API_KEY` is configured, so narration uses deterministic templates, as the spec allows. Statistics never depend on an LLM.
+
+**Sample data:** `public/samples/sample_sales_2024.csv` is **synthetic** (generated with a fixed seed) and labelled as such in the UI.
+
+Totals: 108 unit tests, 19 browser e2e tests (Days 1–3), typecheck and lint clean.
+
+**Next (Day 4):** dataset replacement/versioning, change detection, recompute evidence, mark affected scenes stale, regenerate data-bound content while preserving manual styling and unrelated scenes, an update report, before/after comparison, and the full Evidence Inspector panel.
