@@ -269,7 +269,7 @@ export function Dashboard() {
           >
             <span className="text-yellow-ink">Forge Your</span>
             <br />
-            <span className="text-coral-ink">Video Story</span>
+            <span className="transition-colors duration-1000" style={{ color: ocean.palette.titleAccent }}>Video Story</span>
           </motion.h1>
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="px-text-shadow mt-6 max-w-lg text-lg font-semibold">
             Animate scenes, turn data into motion, and export real MP4s — frame by frame.

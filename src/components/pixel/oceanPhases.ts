@@ -26,6 +26,8 @@ export interface OceanPalette {
   /** Colour wash over the reef for mood (night darkening, sunset warmth). */
   wash: string;
   washAlpha: number;
+  /** Colour of the hero headline second line, chosen to stay readable against this water. */
+  titleAccent: string;
 }
 
 export const PHASES: Record<PhaseName, OceanPalette> = {
@@ -45,6 +47,7 @@ export const PHASES: Record<PhaseName, OceanPalette> = {
     moon: 0,
     wash: "#ff9f8a",
     washAlpha: 0.08,
+    titleAccent: "#ff77a8",
   },
   day: {
     surface: "#8af5e4",
@@ -62,23 +65,27 @@ export const PHASES: Record<PhaseName, OceanPalette> = {
     moon: 0,
     wash: "#ffffff",
     washAlpha: 0,
+    titleAccent: "#ff77a8",
   },
   sunset: {
-    surface: "#ffc46b",
-    bands: ["#ff9f5a", "#e0786a", "#3f7f8f", "#1f5a73", "#123f58"],
-    farReef: "#1b4c63",
-    midReef: "#10374b",
-    kelp1: "#2f6b4c",
-    kelp2: "#4b8a5c",
-    sand: "#e3b27a",
-    sandDeep: "#c9955e",
-    ray: "#ffd39a",
+    // Warm gradient: gold surface → orange → coral → pink → deep rose.
+    surface: "#ffd98a",
+    bands: ["#ffb46a", "#ff8f6b", "#f6728a", "#cf5a8c", "#923f74"],
+    farReef: "#a8467a",
+    midReef: "#7a2f62",
+    kelp1: "#3d7a5c",
+    kelp2: "#5f9a6a",
+    sand: "#f3bd8c",
+    sandDeep: "#db986c",
+    ray: "#ffe4b8",
     rays: 0.9,
-    mote: "#ffe0b0",
+    mote: "#ffe8d6",
     glow: 0.3,
     moon: 0,
-    wash: "#ff8a4a",
-    washAlpha: 0.12,
+    wash: "#ff7a59",
+    washAlpha: 0.06,
+    // Pink water would swallow a pink headline, so sunset uses foam white.
+    titleAccent: "#effffb",
   },
   night: {
     surface: "#2a6f8f",
@@ -96,6 +103,7 @@ export const PHASES: Record<PhaseName, OceanPalette> = {
     moon: 1,
     wash: "#021226",
     washAlpha: 0.32,
+    titleAccent: "#ff77a8",
   },
 };
 
@@ -141,7 +149,21 @@ export function mixPalette(a: OceanPalette, b: OceanPalette, t: number): OceanPa
     moon: mix(a.moon, b.moon, t),
     wash: mixHex(a.wash, b.wash, t),
     washAlpha: mix(a.washAlpha, b.washAlpha, t),
+    titleAccent: mixHex(a.titleAccent, b.titleAccent, t),
   };
+}
+
+/**
+ * Expand the palette's colour stops into `count` evenly blended bands, so the water reads as a
+ * smooth gradient (with dithered seams) instead of a few hard stripes.
+ */
+export function gradientBands(stops: readonly string[], count: number): string[] {
+  if (stops.length === 1) return Array(count).fill(stops[0]);
+  return Array.from({ length: count }, (_, i) => {
+    const t = (i / (count - 1)) * (stops.length - 1);
+    const k = Math.min(stops.length - 2, Math.floor(t));
+    return mixHex(stops[k], stops[k + 1], t - k);
+  });
 }
 
 /** Palette for a local hour in [0, 24). */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mixHex, paletteAt, phaseAt, PHASES } from "@/components/pixel/oceanPhases";
+import { gradientBands, mixHex, paletteAt, phaseAt, PHASES } from "@/components/pixel/oceanPhases";
 
 describe("ocean time-of-day palettes", () => {
   it("mixes hex colours at the endpoints and midpoint", () => {
@@ -35,5 +35,23 @@ describe("ocean time-of-day palettes", () => {
     expect(paletteAt(12).glow).toBe(0);
     expect(paletteAt(1).rays).toBe(0);
     expect(paletteAt(1).glow).toBe(1);
+  });
+});
+
+describe("water gradient", () => {
+  it("expands stops into evenly blended bands that start and end on the stops", () => {
+    const bands = gradientBands(["#000000", "#ffffff"], 5);
+    expect(bands).toEqual(["#000000", "#404040", "#808080", "#bfbfbf", "#ffffff"]);
+    const sunset = gradientBands(PHASES.sunset.bands, 12);
+    expect(sunset[0]).toBe(PHASES.sunset.bands[0]);
+    expect(sunset[11]).toBe(PHASES.sunset.bands[4]);
+  });
+
+  it("keeps sunset water warm (red-dominant) all the way down — no teal stripe", () => {
+    for (const c of gradientBands(PHASES.sunset.bands, 12)) {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+      expect(r, c).toBeGreaterThan(g);
+      expect(r, c).toBeGreaterThan(b);
+    }
   });
 });

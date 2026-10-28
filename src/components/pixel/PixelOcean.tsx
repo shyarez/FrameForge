@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
-import type { OceanPalette } from "./oceanPhases";
+import { gradientBands, type OceanPalette } from "./oceanPhases";
 import { SpriteG, type Swap } from "./Sprite";
 
 /**
@@ -12,6 +12,9 @@ import { SpriteG, type Swap } from "./Sprite";
 
 const W = 320;
 const H = 150;
+/** Water is drawn as this many blended bands of BAND_H units from the surface down. */
+const WATER_BANDS = 12;
+const BAND_H = 9;
 
 function rng(seed: number) {
   return () => {
@@ -175,19 +178,16 @@ export function PixelOcean({ className, palette: p }: { className?: string; pale
     { h: 11, c: "#7be495", d: "1.2s" },
   ];
 
+  const water = gradientBands(p.bands, WATER_BANDS);
+
   return (
     <svg ref={ref} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMax slice" className={`pixelated ${className ?? ""}`} aria-hidden="true">
       <defs>
-        {(
-          [
-            ["w1", p.bands[0], p.surface],
-            ["w2", p.bands[1], p.bands[0]],
-            ["w3", p.bands[2], p.bands[1]],
-            ["w4", p.bands[3], p.bands[2]],
-            ["w5", p.bands[4], p.bands[3]],
-            ["s1", "#031a24", p.sandDeep],
-          ] as const
-        ).map(([id, a, b]) => (
+        {[
+          // Each water band dithers into the one above it.
+          ...water.map((c, i) => [`wd${i}`, c, i === 0 ? p.surface : water[i - 1]] as const),
+          ["s1", "#031a24", p.sandDeep] as const,
+        ].map(([id, a, b]) => (
           <pattern key={id} id={id} width={2} height={2} patternUnits="userSpaceOnUse">
             <rect width={2} height={2} {...tint(a)} />
             <rect width={1} height={1} {...tint(b)} />
@@ -196,18 +196,15 @@ export function PixelOcean({ className, palette: p }: { className?: string; pale
         ))}
       </defs>
 
-      {/* Water column, light at the surface and deepening */}
-      <rect width={W} height={H} {...tint(p.bands[4])} />
+      {/* Water column: a smooth gradient of narrow bands from the surface down, with dithered seams */}
+      <rect width={W} height={H} {...tint(water[water.length - 1])} />
       <rect width={W} height={4} {...tint(p.surface)} />
-      <rect y={4} width={W} height={2} fill="url(#w1)" />
-      <rect y={6} width={W} height={8} {...tint(p.bands[0])} />
-      <rect y={14} width={W} height={2} fill="url(#w2)" />
-      <rect y={16} width={W} height={14} {...tint(p.bands[1])} />
-      <rect y={30} width={W} height={2} fill="url(#w3)" />
-      <rect y={32} width={W} height={28} {...tint(p.bands[2])} />
-      <rect y={60} width={W} height={2} fill="url(#w4)" />
-      <rect y={62} width={W} height={34} {...tint(p.bands[3])} />
-      <rect y={96} width={W} height={2} fill="url(#w5)" />
+      {water.map((c, i) => (
+        <g key={i}>
+          <rect y={4 + i * BAND_H} width={W} height={BAND_H} {...tint(c)} />
+          <rect y={4 + i * BAND_H} width={W} height={2} fill={`url(#wd${i})`} />
+        </g>
+      ))}
 
       {/* Moonlight shimmer on the surface at night */}
       <g opacity={p.moon * 0.7} className="ff-tint">
