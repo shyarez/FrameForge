@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Check, CloudOff, Film, Loader2, Redo2, Save, Undo2 } from "lucide-react";
+import { Check, CloudOff, Film, Gauge, Loader2, Redo2, Save, Undo2 } from "lucide-react";
 import { useDraft } from "@/lib/client/useDraft";
 import { AspectRatioSchema, type AspectRatio } from "@/lib/schema/project";
 import { Logo } from "@/components/brand/Logo";
@@ -27,7 +27,7 @@ function SaveIndicator() {
   );
 }
 
-export function TopBar({ onSave, onExport }: { onSave: () => void; onExport: () => void }) {
+export function TopBar({ onSave, onExport, onEvaluate }: { onSave: () => void; onExport: () => void; onEvaluate: () => void }) {
   const project = useEditor((s) => s.project)!;
   const canUndo = useEditor((s) => s.past.length > 0);
   const canRedo = useEditor((s) => s.future.length > 0);
@@ -60,6 +60,7 @@ export function TopBar({ onSave, onExport }: { onSave: () => void; onExport: () 
         </Select>
         <ThemeToggle />
         <Button onClick={onSave} title="Save (Ctrl+S)"><Save className="size-4" /> Save</Button>
+        <Button onClick={onEvaluate} title="Check claims, evidence coverage, updates and export performance"><Gauge className="size-4" /> Evaluate</Button>
         <Button variant="primary" onClick={onExport}><Film className="size-4" /> Export</Button>
       </div>
     </header>

@@ -162,4 +162,18 @@ describe("Day 4 evidence-aware updates", () => {
     expect(j.error).toBeUndefined();
     expect(j.probe.decodedOk).toBe(true);
   });
+
+  it("evaluates the project: claims reproduce, updates and exports are measured", async () => {
+    await page.getByRole("button", { name: /Evaluate/ }).click();
+    const dialog = page.getByRole("dialog", { name: /How trustworthy/ });
+    await dialog.getByText("Claims reproduced").waitFor({ timeout: 20_000 });
+    const p = await getProject();
+    // Every claim (including the two stuck on v2) recomputes exactly from the version it records.
+    await dialog.getByText(`${p.evidence.length}/${p.evidence.length}`, { exact: true }).first().waitFor();
+    await dialog.getByText("v1 → v2").waitFor();
+    await dialog.getByText("v2 → v3").waitFor();
+    await dialog.getByText("Stale scenes").waitFor();
+    await dialog.getByText(/1 export · /).waitFor();
+    if (SHOTS) await page.screenshot({ path: `${SHOTS}/d5-eval.png` });
+  });
 });

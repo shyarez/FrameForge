@@ -8,6 +8,7 @@ import { Sprite } from "@/components/pixel/Sprite";
 import { ArcadeLabel } from "@/components/ui/primitives";
 import { useEditor } from "@/store/editor";
 import { CanvasStage } from "./CanvasStage";
+import { EvaluationDialog } from "./EvaluationDialog";
 import { ExportDialog } from "./ExportDialog";
 import { Inspector } from "./Inspector";
 import { LeftPanel } from "./LeftPanel";
@@ -24,6 +25,7 @@ export function EditorApp({ projectId }: { projectId: string }) {
   const playing = useEditor((s) => s.playing);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [evalOpen, setEvalOpen] = useState(false);
   const saveChain = useRef<Promise<boolean>>(Promise.resolve(true));
 
   useEffect(() => {
@@ -181,7 +183,7 @@ export function EditorApp({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
-      <TopBar onSave={() => void save()} onExport={() => setExportOpen(true)} />
+      <TopBar onSave={() => void save()} onExport={() => setExportOpen(true)} onEvaluate={() => setEvalOpen(true)} />
       <div className="flex min-h-0 flex-1">
         <LeftPanel />
         <main className="flex min-w-0 flex-1 flex-col">
@@ -192,6 +194,7 @@ export function EditorApp({ projectId }: { projectId: string }) {
       </div>
       <Timeline />
       <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} save={save} />
+      <EvaluationDialog open={evalOpen} onClose={() => setEvalOpen(false)} save={save} />
     </div>
   );
 }

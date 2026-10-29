@@ -5,6 +5,8 @@ import type { AssetInfo } from "@/lib/server/assets";
 import type { DatasetView } from "@/lib/server/datasets";
 import type { Story, StoryRoles } from "@/lib/data/story";
 import type { UpdateReport } from "@/lib/data/update";
+import type { AuditReport } from "@/lib/data/audit";
+import type { ExportMetric } from "@/lib/server/metrics";
 
 async function json<T>(res: Response): Promise<T> {
   const body = await res.json().catch(() => ({}));
@@ -65,5 +67,7 @@ export const api = {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ project }),
     }).then((r) => json<{ project: Project; report: UpdateReport }>(r)),
+  getEvaluation: (projectId: string) =>
+    fetch(`/api/projects/${encodeURIComponent(projectId)}/evaluation`, { cache: "no-store" }).then((r) => json<{ audit: AuditReport; exports: ExportMetric[] }>(r)),
   exportFileUrl: (jobId: string, download = false) => `/api/exports/${encodeURIComponent(jobId)}/file${download ? "?download=1" : ""}`,
 };
