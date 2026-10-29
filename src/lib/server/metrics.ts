@@ -1,7 +1,7 @@
 import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { assertId, safePath } from "./storage";
+import { assertId, exportFile, safePath } from "./storage";
 
 /** Measured performance of one finished export, kept per project for the evaluation panel. */
 export interface ExportMetric {
@@ -47,4 +47,18 @@ export async function appendExportMetric(projectId: string, m: ExportMetric): Pr
 
 export async function deleteExportMetrics(projectId: string): Promise<void> {
   await fs.rm(file(projectId), { force: true });
+}
+
+/** Remove the MP4 files of every recorded export of a project (call before deleting the project). */
+export async function deleteProjectExports(projectId: string): Promise<number> {
+  let removed = 0;
+  for (const m of await readExportMetrics(projectId)) {
+    try {
+      await fs.rm(exportFile(m.jobId), { force: true });
+      removed++;
+    } catch {
+      // A malformed job id is skipped rather than blocking project deletion.
+    }
+  }
+  return removed;
 }

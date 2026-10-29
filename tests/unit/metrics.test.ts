@@ -2,8 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { appendExportMetric, readExportMetrics, type ExportMetric } from "@/lib/server/metrics";
-import { StorageError } from "@/lib/server/storage";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendExportMetric, deleteProjectExports, readExportMetrics, type ExportMetric } from "@/lib/server/metrics";
+import { exportFile, StorageError } from "@/lib/server/storage";
 
 let dir = "";
 beforeAll(() => {
@@ -28,6 +29,17 @@ describe("export metrics log", () => {
     expect(list).toHaveLength(50);
     expect(list[0].jobId).toBe("exp_5");
     expect(list.at(-1)!.jobId).toBe("exp_54");
+  });
+
+  it("deletes exactly the exported videos a project produced", async () => {
+    mkdirSync(path.join(dir, "exports"), { recursive: true });
+    for (const id of ["exp_mineAAAAAA1", "exp_mineAAAAAA2", "exp_otherAAAAA1"]) writeFileSync(exportFile(id), "mp4");
+    await appendExportMetric("prj_owner0001", { ...metric(0), jobId: "exp_mineAAAAAA1" });
+    await appendExportMetric("prj_owner0001", { ...metric(0), jobId: "exp_mineAAAAAA2" });
+    expect(await deleteProjectExports("prj_owner0001")).toBe(2);
+    expect(existsSync(exportFile("exp_mineAAAAAA1"))).toBe(false);
+    expect(existsSync(exportFile("exp_mineAAAAAA2"))).toBe(false);
+    expect(existsSync(exportFile("exp_otherAAAAA1"))).toBe(true); // a video from another project is untouched
   });
 
   it("refuses unsafe project ids", async () => {

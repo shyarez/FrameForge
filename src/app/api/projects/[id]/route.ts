@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/server/http";
+import { deleteProjectExports } from "@/lib/server/metrics";
 import { assertId, deleteProject, loadProject, saveProject, StorageError } from "@/lib/server/storage";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -28,7 +29,9 @@ export async function PUT(req: Request, { params }: Ctx) {
 export async function DELETE(_req: Request, { params }: Ctx) {
   try {
     const { id } = await params;
-    await deleteProject(assertId(id));
+    // Exported videos are found through the export log, so remove them before the log goes with the project.
+    await deleteProjectExports(assertId(id));
+    await deleteProject(id);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return errorResponse(err);
