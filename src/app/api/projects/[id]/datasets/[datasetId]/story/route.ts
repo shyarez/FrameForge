@@ -11,6 +11,8 @@ type Ctx = { params: Promise<{ id: string; datasetId: string }> };
 const Body = z.object({
   roles: z.object({ measure: z.string().optional(), category: z.string().optional(), order: z.string().optional() }),
   aspectRatio: AspectRatioSchema,
+  /** The dataset version the project is on. Newer stored versions only take effect through an update. */
+  version: z.number().int().min(1).optional(),
 });
 
 /** Generate an editable story from the stored dataset version. All numbers are computed here. */
@@ -19,7 +21,7 @@ export async function POST(req: Request, { params }: Ctx) {
     const { id, datasetId } = await params;
     const body = Body.safeParse(await req.json().catch(() => null));
     if (!body.success) throw new StorageError("Invalid story request", 400);
-    const { meta, table, version, hash } = await loadDataset(assertId(id), datasetId);
+    const { meta, table, version, hash } = await loadDataset(assertId(id), datasetId, body.data.version);
     try {
       const story = generateStory(table, { id: meta.id, name: meta.name, version, hash }, body.data.roles, body.data.aspectRatio, { now: new Date().toISOString() });
       return NextResponse.json({ story });

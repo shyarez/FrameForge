@@ -97,6 +97,28 @@ export async function createDataset(projectId: string, fileName: string, text: s
   return view(meta, table, parsed.rows.slice(0, 25), parsed.warnings);
 }
 
+/**
+ * Store a replacement CSV as the next version of an existing dataset. An upload identical to the
+ * current version (same normalised hash) does not create a new version.
+ */
+export async function addDatasetVersion(projectId: string, datasetId: string, text: string): Promise<{ view: DatasetView; identical: boolean }> {
+  const meta = await readMeta(projectId, datasetId);
+  const parsed = parseOrReject(text);
+  const hash = hashCsv(parsed.normalized);
+  const current = meta.versions.find((v) => v.version === meta.current)!;
+  if (hash === current.hash) {
+    const table = profileTable(parsed.headers, parsed.rows);
+    return { view: view(meta, table, parsed.rows.slice(0, 25), parsed.warnings), identical: true };
+  }
+  const table = profileTable(parsed.headers, parsed.rows);
+  const version = Math.max(...meta.versions.map((v) => v.version)) + 1;
+  await fs.writeFile(versionFile(projectId, datasetId, version), parsed.normalized, "utf8");
+  meta.versions.push({ version, hash, rowCount: table.rowCount, columnCount: parsed.headers.length, uploadedAt: new Date().toISOString(), warnings: parsed.warnings });
+  meta.current = version;
+  await fs.writeFile(metaFile(projectId, datasetId), JSON.stringify(meta, null, 2), "utf8");
+  return { view: view(meta, table, parsed.rows.slice(0, 25), parsed.warnings), identical: false };
+}
+
 /** Load a stored version (current by default) as a profiled table. */
 export async function loadDataset(projectId: string, datasetId: string, version?: number) {
   const meta = await readMeta(projectId, datasetId);
