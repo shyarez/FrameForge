@@ -164,7 +164,7 @@ function NewProjectForm({ initialTemplate, onCreated }: { initialTemplate: Templ
 const QUEST: { level: number; title: string; body: string; sprite: SpriteName; status: "ready" | "soon"; tint: string }[] = [
   { level: 1, title: "Create", body: "Start a project from a starter animation or a blank scene.", sprite: "clapper", status: "ready", tint: "bg-yellow" },
   { level: 2, title: "Animate", body: "Arrange text, shapes and charts. Add fade, slide, scale and pop.", sprite: "monitor", status: "ready", tint: "bg-aqua" },
-  { level: 3, title: "Data story", body: "Import a CSV and generate evidence-linked chart scenes.", sprite: "database", status: "soon", tint: "bg-mint" },
+  { level: 3, title: "Data story", body: "Import a CSV and generate evidence-linked chart scenes.", sprite: "database", status: "ready", tint: "bg-mint" },
   { level: 4, title: "Export", body: "Render frame-by-frame to a verified H.264 MP4.", sprite: "reel", status: "ready", tint: "bg-coral" },
 ];
 
