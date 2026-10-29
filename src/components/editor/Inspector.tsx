@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowDown, ArrowUp, BarChart3, Copy, Image as ImageIcon, Shapes, Trash2, Type } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, BarChart3, Copy, Image as ImageIcon, Shapes, Trash2, Type } from "lucide-react";
+import { useState } from "react";
 import { useDraft } from "@/lib/client/useDraft";
 import { formatValue } from "@/lib/data/format";
 import {
@@ -12,7 +13,8 @@ import {
   type Scene,
   type SceneElement,
 } from "@/lib/schema/project";
-import { Button, Field, IconButton, Select, TextInput } from "@/components/ui/primitives";
+import { Button, Field, IconButton, Select, TextInput, cx } from "@/components/ui/primitives";
+import { EvidenceInspector } from "./EvidenceInspector";
 import { findElement, findScene, useEditor } from "@/store/editor";
 
 /** Number field that commits on blur/Enter so typing doesn't spam undo history. */
@@ -355,24 +357,55 @@ function SceneInspector({ scene, isFirst }: { scene: Scene; isFirst: boolean }) 
   );
 }
 
+/** Shown on scenes a dataset update could not refresh. */
+function StaleBanner({ scene }: { scene: Scene }) {
+  if (!scene.stale) return null;
+  return (
+    <div className="px-box-flat m-3 bg-coral/10 p-3 text-xs text-coral-ink [--px-c:var(--color-coral)]" role="status">
+      <p className="mb-1 flex items-center gap-1.5 font-semibold"><AlertTriangle className="size-3.5" /> Stale after data v{scene.stale.version}</p>
+      <ul className="list-disc pl-4">
+        {scene.stale.reasons.map((r) => <li key={r}>{r}</li>)}
+      </ul>
+    </div>
+  );
+}
+
 export function Inspector() {
   const project = useEditor((s) => s.project)!;
   const selectedElementId = useEditor((s) => s.selectedElementId);
   const selectedSceneId = useEditor((s) => s.selectedSceneId);
+  const [tab, setTab] = useState<"properties" | "evidence">("properties");
   const hit = findElement(project, selectedElementId);
   const scene = findScene(project, selectedSceneId);
 
   return (
-    <aside className="scroll-thin flex w-72 shrink-0 flex-col overflow-y-auto border-l-[3px] border-line bg-night" aria-label="Properties">
-      <div className="flex h-11 shrink-0 items-center justify-between border-b-[3px] border-line bg-panel px-4">
-        <h2 className="font-arcade text-[10px] tracking-wider text-yellow-ink uppercase">{hit ? "Element" : "Properties"}</h2>
-        {hit && (
-          <Button variant="ghost" className="h-7 px-2 text-xs" onClick={() => useEditor.getState().selectElement(null)}>
-            Scene settings
-          </Button>
-        )}
+    <aside className="scroll-thin flex w-72 shrink-0 flex-col overflow-y-auto border-l-[3px] border-line bg-night" aria-label="Inspector">
+      <div role="tablist" className="grid h-11 shrink-0 grid-cols-2 border-b-[3px] border-line bg-panel">
+        {(
+          [
+            ["properties", hit ? "Element" : "Properties"],
+            ["evidence", `Evidence (${project.evidence.length})`],
+          ] as const
+        ).map(([id, label]) => (
+          <button key={id} role="tab" type="button" aria-selected={tab === id} onClick={() => setTab(id)}
+            className={cx("font-arcade text-[9px] tracking-wider uppercase transition-colors", tab === id ? "bg-night text-yellow-ink" : "text-mute hover:text-paper")}>
+            {label}
+          </button>
+        ))}
       </div>
-      {hit ? <ElementInspector key={hit.element.id} el={hit.element} /> : scene ? <SceneInspector scene={scene} isFirst={project.scenes[0].id === scene.id} /> : null}
+      {tab === "evidence" ? (
+        <EvidenceInspector />
+      ) : (
+        <>
+          {hit && (
+            <Button variant="ghost" className="mx-3 mt-2 h-7 justify-start px-2 text-xs" onClick={() => useEditor.getState().selectElement(null)}>
+              ← Scene settings
+            </Button>
+          )}
+          {scene && <StaleBanner scene={scene} />}
+          {hit ? <ElementInspector key={hit.element.id} el={hit.element} /> : scene ? <SceneInspector scene={scene} isFirst={project.scenes[0].id === scene.id} /> : null}
+        </>
+      )}
     </aside>
   );
 }

@@ -6,6 +6,7 @@ import { snapMove, type Guide } from "@/lib/engine/snap";
 import { CANVAS_SIZES, type SceneElement, type TextElement } from "@/lib/schema/project";
 import { FONT_STACKS, SceneView } from "@/components/render/SceneView";
 import { findElement, findScene, useEditor } from "@/store/editor";
+import { elementsShowing } from "./EvidenceInspector";
 
 type Handle = "nw" | "ne" | "sw" | "se";
 type Drag =
@@ -72,6 +73,7 @@ export function CanvasStage() {
   const playing = useEditor((s) => s.playing);
   const selectedSceneId = useEditor((s) => s.selectedSceneId);
   const selectedElementId = useEditor((s) => s.selectedElementId);
+  const highlightEvidenceId = useEditor((s) => s.highlightEvidenceId);
   const { selectElement, beginGesture, updateTransient, endGesture } = useEditor.getState();
 
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -208,6 +210,16 @@ export function CanvasStage() {
             <div key={i} aria-hidden className="pointer-events-none absolute bg-coral"
               style={g.axis === "x" ? { left: g.pos - 1 / scale, top: 0, width: 2 / scale, height: logical.height } : { top: g.pos - 1 / scale, left: 0, height: 2 / scale, width: logical.width }} />
           ))}
+          {/* Elements showing the claim hovered in the Evidence Inspector */}
+          {highlightEvidenceId &&
+            scene &&
+            elementsShowing(highlightEvidenceId, scene).map((el) => {
+              const e = el as SceneElement;
+              return (
+                <div key={e.id} aria-hidden className="pointer-events-none absolute"
+                  style={{ left: e.x, top: e.y, width: e.width, height: e.height, transform: `rotate(${e.rotation}deg)`, outline: `${4 / scale}px dashed #7be495`, outlineOffset: 6 / scale, background: "rgb(123 228 149 / 0.08)" }} />
+              );
+            })}
           {editing?.type === "text" && <InlineTextEditor key={editing.id} el={editing} onDone={finishEditing} />}
           {selected && (
             <div

@@ -168,6 +168,11 @@ export function Timeline() {
                 <span className="shrink-0 font-mono text-mute">{(scene.durationMs / 1000).toFixed(1)}s</span>
               </div>
               <SceneThumb project={project} scene={scene} />
+              {scene.stale && (
+                <span className="absolute right-1.5 bottom-1.5 bg-coral px-1 py-0.5" title={scene.stale.reasons.join("\n")}>
+                  <span className="font-arcade text-[7px] text-onaccent uppercase">Stale</span>
+                </span>
+              )}
               <div aria-hidden title="Drag to change duration" {...resizeHandlers(scene)}
                 className="absolute top-0 right-0 bottom-0 w-2 cursor-ew-resize bg-transparent hover:bg-aqua/50 active:bg-aqua" />
               {scene.transition.type !== "none" && i > 0 && (
