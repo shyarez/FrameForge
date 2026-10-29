@@ -84,6 +84,11 @@ describe("planUpdate", () => {
     expect(project.evidence.every((e) => e.datasetVersion === 2 && e.datasetHash === "h2")).toBe(true);
     expect(project.evidence.find((e) => e.label === "Sum of revenue")!.previous).toMatchObject({ datasetVersion: 1, result: { kind: "scalar", value: 625 } });
     expect(project.datasets[0]).toMatchObject({ version: 2, hash: "h2" });
+    // The applied update is recorded for evaluation, with the selectivity numbers.
+    expect(project.updates).toHaveLength(1);
+    expect(project.updates![0]).toMatchObject({ datasetId: ds.id, fromVersion: 1, toVersion: 2, evidenceChanged: report.counts.evidenceChanged, elementsUpdated: report.counts.elementsUpdated });
+    expect(report.counts.elementsTotal).toBe(project.scenes.reduce((n, s) => n + s.elements.length, 0));
+    expect(report.counts.elementsUpdated).toBeLessThan(report.counts.elementsTotal);
     expect(ProjectSchema.safeParse(project).success).toBe(true);
   });
 
@@ -146,7 +151,9 @@ describe("planUpdate", () => {
     const a = planUpdate(p, ds.id, table(V2), ver(V2, 2, "h2"), "t");
     const b = planUpdate(p, ds.id, table(V2), ver(V2, 2, "h2"), "t");
     expect(JSON.stringify(p)).toBe(snapshot); // the input project is never mutated
-    expect(JSON.stringify(a.project)).toBe(JSON.stringify(b.project));
+    // Everything is deterministic except measured wall time in the update history.
+    const untimed = (pr: Project) => JSON.stringify({ ...pr, updates: pr.updates?.map((u) => ({ ...u, durationMs: 0 })) });
+    expect(untimed(a.project)).toBe(untimed(b.project));
     expect(JSON.stringify({ ...a.report, durationMs: 0 })).toBe(JSON.stringify({ ...b.report, durationMs: 0 }));
   });
 });

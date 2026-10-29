@@ -13,7 +13,8 @@ import { computeCalc, type CalcResult } from "./stats";
  *     Styling, layout and animation are never touched, and unrelated scenes are left as they are;
  *  5. mark scenes stale when a claim they show is broken, instead of guessing;
  *  6. return the new project and a report.
- * Pure and deterministic: no I/O, and `now` is passed in.
+ * Pure and deterministic: no I/O, and `now` is passed in. The only varying output is measured wall
+ * time (report.durationMs and the matching update-history entry).
  */
 
 export type EvidenceStatus = "unchanged" | "changed" | "broken";
@@ -69,6 +70,8 @@ export interface UpdateReport {
     scenesStale: number;
     scenesPreserved: number;
     elementsUpdated: number;
+    /** All elements in the project, for the refreshed-vs-total selectivity ratio. */
+    elementsTotal: number;
   };
   durationMs: number;
 }
@@ -202,8 +205,30 @@ export function planUpdate(project: Project, datasetId: string, table: Table, ne
       scenesStale: sceneChanges.filter((s) => s.status === "stale").length,
       scenesPreserved: out.scenes.length - sceneChanges.filter((s) => s.status !== "unchanged").length,
       elementsUpdated: sceneChanges.reduce((n, s) => n + s.elements.length, 0),
+      elementsTotal: out.scenes.reduce((n, s) => n + s.elements.length, 0),
     },
     durationMs: Math.round(((typeof performance !== "undefined" ? performance.now() : Date.now()) - t0) * 100) / 100,
   };
+  // Keep a compact history of applied updates for evaluation (the editor only saves it if applied).
+  const c = report.counts;
+  out.updates = [
+    ...(out.updates ?? []),
+    {
+      datasetId,
+      fromVersion,
+      toVersion: next.version,
+      at: now,
+      durationMs: report.durationMs,
+      evidenceChanged: c.evidenceChanged,
+      evidenceUnchanged: c.evidenceUnchanged,
+      evidenceBroken: c.evidenceBroken,
+      scenesTotal: c.scenesTotal,
+      scenesUpdated: c.scenesUpdated,
+      scenesStale: c.scenesStale,
+      scenesPreserved: c.scenesPreserved,
+      elementsUpdated: c.elementsUpdated,
+      elementsTotal: c.elementsTotal,
+    },
+  ].slice(-100);
   return { project: out, report };
 }

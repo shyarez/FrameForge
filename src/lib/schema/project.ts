@@ -202,6 +202,25 @@ export const EvidenceSchema = z.object({
 });
 export type Evidence = z.infer<typeof EvidenceSchema>;
 
+/** One applied dataset update, kept for evaluation (what changed vs what was preserved, and how fast). */
+export const UpdateRecordSchema = z.object({
+  datasetId: z.string(),
+  fromVersion: z.number().int(),
+  toVersion: z.number().int(),
+  at: z.string(),
+  durationMs: z.number().min(0),
+  evidenceChanged: z.number().int().min(0),
+  evidenceUnchanged: z.number().int().min(0),
+  evidenceBroken: z.number().int().min(0),
+  scenesTotal: z.number().int().min(0),
+  scenesUpdated: z.number().int().min(0),
+  scenesStale: z.number().int().min(0),
+  scenesPreserved: z.number().int().min(0),
+  elementsUpdated: z.number().int().min(0),
+  elementsTotal: z.number().int().min(0),
+});
+export type UpdateRecord = z.infer<typeof UpdateRecordSchema>;
+
 export const ProjectSchema = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
   id: z.string().regex(/^[A-Za-z0-9_-]{6,40}$/),
@@ -212,6 +231,8 @@ export const ProjectSchema = z.object({
   scenes: z.array(SceneSchema).min(1).max(100),
   datasets: z.array(DatasetRefSchema),
   evidence: z.array(EvidenceSchema),
+  /** Applied dataset updates, newest last (optional so older project files stay valid). */
+  updates: z.array(UpdateRecordSchema).max(100).optional(),
   exportSettings: ExportSettingsSchema,
 });
 export type Project = z.infer<typeof ProjectSchema>;
