@@ -136,3 +136,18 @@ Totals: 108 unit tests, 19 browser e2e tests (Days 1–3), typecheck and lint cl
 **Bugs found in review and fixed:** percentage claims showed relative change ("▲ 49.1%") instead of percentage points ("▲ 16.8 pts"); the Evidence Inspector flagged healthy claims as broken when they shared a stale scene; the dashboard still labelled Data story as "Coming soon".
 
 Totals: 131 unit tests, 25 browser e2e tests (Days 1–4), typecheck and lint clean.
+
+## Day 5 — evaluation, cleanup and documentation
+
+| Feature | Verified by |
+|---|---|
+| Export performance log per project (frames, resolution, render/total time, frames per second, size; last 50) | unit + a real export |
+| Update history recorded in the project (claims changed/broken, elements refreshed of total, scenes preserved, plan time) | unit |
+| Evaluation panel (**Evaluate** in the top bar): claim reproducibility against the recorded dataset version, evidence coverage of on-screen numbers and charts, text consistency, stale scenes, update history, export performance | unit (`audit.test.ts`) + e2e |
+| Benchmark `npm run eval` → `docs/EVALUATION.md` (pipeline speed at 1k/10k/50k rows; five update scenarios with correctness, preservation and reproducibility checks; exits non-zero if any check fails) | run and reviewed |
+| Housekeeping: browser tests delete the projects they create; deleting a project deletes its exported videos | unit + e2e (dashboard and `data/exports` clean after a full run) |
+| README rewritten with real feature status, stack, setup, scripts, evaluation summary and structure | review |
+
+**Fixed in review:** the benchmark first timed project construction together with the update, making updates look twice as slow as regeneration; inputs are now built before timing.
+
+Totals: 138 unit tests, 26 browser e2e tests, typecheck and lint clean.
