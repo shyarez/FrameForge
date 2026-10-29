@@ -40,7 +40,7 @@ describe("Day 1 vertical slice", () => {
 
   it("adds a rectangle, drags it, and supports undo/redo", async () => {
     await page.getByRole("button", { name: /Rectangle/ }).click();
-    await expect.poll(() => page.getByRole("heading", { name: "Element" }).count()).toBe(1);
+    await expect.poll(() => page.getByRole("tab", { name: "Element", exact: true, selected: true }).count()).toBe(1);
 
     const stage = await page.locator("[data-stage]").boundingBox();
     const cx = stage!.x + stage!.width / 2;

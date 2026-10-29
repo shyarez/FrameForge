@@ -107,3 +107,32 @@ Totals: 80 unit tests, 13 browser e2e tests (Day 1 + Day 2), typecheck and lint 
 Totals: 108 unit tests, 19 browser e2e tests (Days 1–3), typecheck and lint clean.
 
 **Next (Day 4):** dataset replacement/versioning, change detection, recompute evidence, mark affected scenes stale, regenerate data-bound content while preserving manual styling and unrelated scenes, an update report, before/after comparison, and the full Evidence Inspector panel.
+
+## Day 4 — status: done
+
+**Evidence-aware scene update engine** (`src/lib/data/update.ts`, pure and deterministic). When a dataset gets a new version:
+1. recompute every evidence record from that dataset;
+2. classify each as **unchanged / changed / broken** (the calculation can no longer run, e.g. a column was removed);
+3. find dependent scenes through each record's `sceneIds` (the dependency registry);
+4. refresh only data-bound content (bound text plus its cached values, bound chart data), never styling, layout, animation or unrelated scenes;
+5. mark scenes **stale** with reasons when a claim they show is broken, keeping the last good value;
+6. return the new project and an update report (counts and timing).
+
+| Feature | Verified by |
+|---|---|
+| Versioned dataset storage; identical re-upload detected by sha256 (CRLF-insensitive); any version loadable | unit (`datasets.test.ts`) + e2e |
+| Update engine: unchanged/changed/broken, selective refresh, stale marking, input never mutated, deterministic | unit (`update.test.ts`, 6 tests): refreshed claims equal a fresh analysis of the new data |
+| Manual styling on bound elements preserved; hand-edited (unbound) text untouched; unrelated scenes byte-identical | unit + e2e |
+| Sign-dependent wording ("On the rise" / "Losing ground") and coverage text derived from evidence, so updates keep them true | unit |
+| Update review dialog: metrics, claim before → after with change badges (relative %, or percentage points for percentage claims), animated before/after wipe per scene, stale reasons | e2e + screenshots |
+| Apply as one undo step | unit (`editorStore.test.ts`) + e2e |
+| Story generation and preview use the dataset version the project is on, so a stored-but-not-applied version never leaks in | e2e + code review |
+| Evidence Inspector tab: every claim, previous → current, calculation, hash, linked scenes; hover outlines elements on the canvas; per-claim broken detection | e2e + screenshots |
+| Stale badges on timeline cards and a banner in the scene inspector | e2e |
+| Export still works after updates | e2e |
+
+**Honest limits.** Scene **content** updates selectively, but **video rendering does not**: export re-renders every frame (no segment caching). The UI says so in the update dialog.
+
+**Bugs found in review and fixed:** percentage claims showed relative change ("▲ 49.1%") instead of percentage points ("▲ 16.8 pts"); the Evidence Inspector flagged healthy claims as broken when they shared a stale scene; the dashboard still labelled Data story as "Coming soon".
+
+Totals: 131 unit tests, 25 browser e2e tests (Days 1–4), typecheck and lint clean.
