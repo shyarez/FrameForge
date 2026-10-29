@@ -84,7 +84,7 @@ describe("story generation", () => {
   it("states the real numbers", () => {
     const texts = story.scenes.flatMap((s) => s.elements.flatMap((e) => (e.type === "text" ? [e.text] : [])));
     expect(texts).toContain("870"); // 120+80+150+90+170+60+200, the missing value excluded
-    expect(texts).toContain("Based on 7 of 8 records; the rest had no value.");
+    expect(texts).toContain("Based on 7 of 8 records.");
     expect(texts).toContain("North leads with 73.6% of the total.");
     // Monthly sums 200 → 240 → 230 → 200: an honest "no change", not an invented trend.
     expect(texts).toContain("Revenue changed 0% from 2024-01 to 2024-04.");

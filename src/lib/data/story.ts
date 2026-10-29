@@ -113,7 +113,6 @@ export function generateStory(
     evidence.push(e);
     return e;
   };
-  const scalar = (e: Evidence) => (e.result.kind === "scalar" ? e.result.value : 0);
 
   // ---- layout helpers (logical canvas pixels) ----
   const { width: W, height: H } = CANVAS_SIZES[aspect];
@@ -166,12 +165,12 @@ export function generateStory(
     const mean = ev(`Mean of ${roles.measure}`, { op: "aggregate", agg: "mean", column: roles.measure }, "decimal", unit);
     const present = ev(`Records with a ${roles.measure} value`, { op: "aggregate", agg: "count", column: roles.measure }, "integer");
     const sc = kindScene("metric", "Key metric", PALETTE.night, { type: "fade", durationMs: 500 }, 5000);
-    const missing = rows.result.kind === "scalar" && scalar(present) < scalar(rows);
     sc.elements = [
       label(`Total ${lowerMeasure}`, Math.round(H * 0.22)),
       bound("{0}", [total], { name: "Total", fontFamily: "pixel", fontSize: Math.round((portrait ? 230 : 260) * s), fontWeight: 700, color: PALETTE.yellow, x: pad, y: Math.round(H * 0.22 + 60 * s), width: innerW, height: Math.round(300 * s), lineHeight: 1, enter: anim("pop", 200, 1400) }, true),
       bound("That is {0} per record on average.", [mean], { name: "Average", fontFamily: "sans", fontSize: Math.round(46 * s), fontWeight: 600, x: pad, y: Math.round(H * 0.22 + 390 * s), width: innerW, height: Math.round(70 * s), enter: anim("fade", 900, 600) }),
-      bound(missing ? "Based on {0} of {1} records; the rest had no value." : "Based on all {1} records.", [present, rows], { name: "Coverage", fontFamily: "sans", fontSize: Math.round(32 * s), fontWeight: 400, color: PALETTE.aqua, x: pad, y: Math.round(H * 0.22 + 480 * s), width: innerW, height: Math.round(60 * s), enter: anim("fade", 1200, 600) }),
+      // One wording for every case, so it stays true when values are later filled in or go missing.
+      bound("Based on {0} of {1} records.", [present, rows], { name: "Coverage", fontFamily: "sans", fontSize: Math.round(32 * s), fontWeight: 400, color: PALETTE.aqua, x: pad, y: Math.round(H * 0.22 + 480 * s), width: innerW, height: Math.round(60 * s), enter: anim("fade", 1200, 600) }),
     ].map(withIds);
     link(sc, total, mean, present, rows);
     scenes.push(sc);
@@ -227,14 +226,13 @@ export function generateStory(
     const points = series.result.kind === "series" ? series.result.points : [];
     if (points.length >= 3) {
       const change = ev(`Change in ${roles.measure ?? "records"} from first to last ${roles.order}`, { op: "trendChange", x: roles.order, measure: roles.measure, agg }, "signedPercent");
-      const pct = scalar(change);
       // Neutral wording with a signed value stays true whichever way the number moves.
       const changeText = `${measureName} changed {0} from {0:from} to {0:to}.`;
       const sc = kindScene("trend", "Trend", PALETTE.night, { type: "fade", durationMs: 500 }, 6000);
       const chartTop = pad + Math.round(200 * s);
       sc.elements = [
         label(`${measureName} over time`, pad),
-        title(pct > 1 ? "On the rise" : pct < -1 ? "Losing ground" : "Holding steady", pad + Math.round(50 * s)),
+        bound("{0:headline}", [change], title("", pad + Math.round(50 * s))),
         createChart({ name: "Trend chart", chartType: "line", data: points, colors: [PALETTE.yellow, PALETTE.coral], x: pad, y: chartTop, width: innerW, height: H - chartTop - pad - Math.round(110 * s), binding: { evidenceId: series.id }, enter: anim("fade", 300, 1800, "easeInOut") }),
         bound(changeText, [change], { name: "Change", fontFamily: "sans", fontSize: Math.round(40 * s), fontWeight: 600, x: pad, y: H - pad - Math.round(80 * s), width: innerW, height: Math.round(70 * s), enter: anim("slide-up", 1800, 600) }),
       ].map(withIds);

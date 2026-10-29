@@ -11,6 +11,8 @@ export function evidenceStrings(e: Evidence): Record<string, string> {
   const out: Record<string, string> = {};
   if (e.result.kind === "scalar") {
     if (e.result.label !== undefined) out.label = e.result.label;
+    // Wording that depends on the sign of a change is derived here, so a data update can never leave it stale.
+    if (e.calc.op === "trendChange") out.headline = e.result.value > 1 ? "On the rise" : e.result.value < -1 ? "Losing ground" : "Holding steady";
     for (const [k, v] of Object.entries(e.result.detail ?? {})) if (typeof v === "string") out[k] = v;
   } else if (e.result.points.length) {
     out.first = e.result.points[0].label;
