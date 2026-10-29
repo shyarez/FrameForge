@@ -155,6 +155,8 @@ export const SceneSchema = z.object({
       kind: z.enum(["intro", "metric", "comparison", "trend", "distribution", "summary"]),
     })
     .optional(),
+  /** Set when a dataset update could not refresh this scene (e.g. a column it uses was removed). */
+  stale: z.object({ datasetId: z.string(), version: z.number().int(), reasons: z.array(z.string()) }).optional(),
 });
 export type Scene = z.infer<typeof SceneSchema>;
 
@@ -195,6 +197,8 @@ export const EvidenceSchema = z.object({
   unit: z.string().nullable(),
   sceneIds: z.array(z.string()),
   computedAt: z.string(),
+  /** The value before the most recent dataset update, for before/after comparison. */
+  previous: z.object({ datasetVersion: z.number().int().min(1), result: CalcResultSchema, computedAt: z.string() }).optional(),
 });
 export type Evidence = z.infer<typeof EvidenceSchema>;
 
