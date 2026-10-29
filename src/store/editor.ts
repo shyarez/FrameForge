@@ -65,6 +65,11 @@ interface EditorState {
   removeDataset(id: string): void;
   /** Insert generated scenes after the selected scene, register their evidence, and select the first one. */
   insertStory(story: Story): void;
+  /** Replace the document with an updated version (e.g. an applied dataset update) as one undo step. */
+  replaceProject(next: Project): void;
+  /** Evidence currently highlighted in the Evidence Inspector (outlined on the canvas). Not part of history. */
+  highlightEvidenceId: string | null;
+  setHighlightEvidence(id: string | null): void;
   duplicateElement(id: string): void;
   copyElement(id: string): void;
   pasteElement(): void;
@@ -122,6 +127,22 @@ export const useEditor = create<EditorState>()((set, get) => {
     saveState: "saved",
     assets: [],
     clipboard: null,
+    highlightEvidenceId: null,
+    setHighlightEvidence(id) {
+      set({ highlightEvidenceId: id });
+    },
+    replaceProject(next) {
+      const { project, past, selectedSceneId, selectedElementId } = get();
+      if (!project || next.id !== project.id) return;
+      set({
+        project: next,
+        past: [...past, project].slice(-HISTORY_LIMIT),
+        future: [],
+        saveState: "dirty",
+        selectedSceneId: findScene(next, selectedSceneId) ? selectedSceneId : next.scenes[0].id,
+        selectedElementId: findElement(next, selectedElementId) ? selectedElementId : null,
+      });
+    },
 
     setAssets(assets) {
       set({ assets });

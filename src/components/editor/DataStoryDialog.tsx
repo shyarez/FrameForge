@@ -56,7 +56,7 @@ export function DataStoryDialog({ datasetId, initial, onClose }: { datasetId: st
     if (!datasetId || view) return;
     let cancelled = false;
     api
-      .getDataset(project.id, datasetId)
+      .getDataset(project.id, datasetId, project.datasets.find((d) => d.id === datasetId)?.version)
       .then(({ dataset }) => {
         if (cancelled) return;
         setView(dataset);
@@ -66,14 +66,16 @@ export function DataStoryDialog({ datasetId, initial, onClose }: { datasetId: st
     return () => {
       cancelled = true;
     };
-  }, [datasetId, view, project.id]);
+  }, [datasetId, view, project.id, project.datasets]);
 
   const generate = async () => {
     if (!datasetId) return;
     setBusy(true);
     setError(null);
     try {
-      const { story } = await api.generateStory(project.id, datasetId, roles, project.aspectRatio);
+      // Use the version this project is on, so a stored-but-not-applied update never leaks in.
+      const version = project.datasets.find((d) => d.id === datasetId)?.version;
+      const { story } = await api.generateStory(project.id, datasetId, roles, project.aspectRatio, version);
       setStory(story);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

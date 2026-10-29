@@ -4,6 +4,7 @@ import type { ExportJob } from "@/lib/server/exportJobs";
 import type { AssetInfo } from "@/lib/server/assets";
 import type { DatasetView } from "@/lib/server/datasets";
 import type { Story, StoryRoles } from "@/lib/data/story";
+import type { UpdateReport } from "@/lib/data/update";
 
 async function json<T>(res: Response): Promise<T> {
   const body = await res.json().catch(() => ({}));
@@ -39,15 +40,30 @@ export const api = {
     form.append("file", file);
     return fetch(`/api/projects/${encodeURIComponent(projectId)}/datasets`, { method: "POST", body: form }).then((r) => json<{ dataset: DatasetView }>(r));
   },
-  getDataset: (projectId: string, datasetId: string) =>
-    fetch(`/api/projects/${encodeURIComponent(projectId)}/datasets/${encodeURIComponent(datasetId)}`, { cache: "no-store" }).then((r) => json<{ dataset: DatasetView }>(r)),
+  getDataset: (projectId: string, datasetId: string, version?: number) =>
+    fetch(`/api/projects/${encodeURIComponent(projectId)}/datasets/${encodeURIComponent(datasetId)}${version ? `?version=${version}` : ""}`, { cache: "no-store" }).then((r) =>
+      json<{ dataset: DatasetView }>(r),
+    ),
   deleteDataset: (projectId: string, datasetId: string) =>
     fetch(`/api/projects/${encodeURIComponent(projectId)}/datasets/${encodeURIComponent(datasetId)}`, { method: "DELETE" }).then((r) => json<{ ok: true }>(r)),
-  generateStory: (projectId: string, datasetId: string, roles: StoryRoles, aspectRatio: Project["aspectRatio"]) =>
+  generateStory: (projectId: string, datasetId: string, roles: StoryRoles, aspectRatio: Project["aspectRatio"], version?: number) =>
     fetch(`/api/projects/${encodeURIComponent(projectId)}/datasets/${encodeURIComponent(datasetId)}/story`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ roles, aspectRatio }),
+      body: JSON.stringify({ roles, aspectRatio, version }),
     }).then((r) => json<{ story: Story }>(r)),
+  uploadDatasetVersion: (projectId: string, datasetId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return fetch(`/api/projects/${encodeURIComponent(projectId)}/datasets/${encodeURIComponent(datasetId)}/versions`, { method: "POST", body: form }).then((r) =>
+      json<{ dataset: DatasetView; identical: boolean }>(r),
+    );
+  },
+  planDatasetUpdate: (project: Project, datasetId: string) =>
+    fetch(`/api/projects/${encodeURIComponent(project.id)}/datasets/${encodeURIComponent(datasetId)}/update`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project }),
+    }).then((r) => json<{ project: Project; report: UpdateReport }>(r)),
   exportFileUrl: (jobId: string, download = false) => `/api/exports/${encodeURIComponent(jobId)}/file${download ? "?download=1" : ""}`,
 };

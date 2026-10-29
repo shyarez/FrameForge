@@ -73,3 +73,26 @@ describe("editor store", () => {
     expect(ProjectSchema.safeParse(s().project).success).toBe(true);
   });
 });
+
+describe("applying a dataset update", () => {
+  it("replaces the document as a single undo step", () => {
+    const before = s().project!;
+    const next = structuredClone(before);
+    next.name = "Updated";
+    next.scenes[0].name = "Refreshed";
+    const pastLen = s().past.length;
+    s().replaceProject(next);
+    expect(s().project!.name).toBe("Updated");
+    expect(s().past.length).toBe(pastLen + 1);
+    expect(s().saveState).toBe("dirty");
+    s().undo();
+    expect(s().project).toBe(before);
+  });
+
+  it("ignores a document for a different project", () => {
+    const other = createProject("Other", "16:9", "blank");
+    const was = s().project;
+    s().replaceProject(other);
+    expect(s().project).toBe(was);
+  });
+});

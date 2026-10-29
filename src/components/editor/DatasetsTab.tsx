@@ -1,6 +1,6 @@
 "use client";
 
-import { Database, FlaskConical, Loader2, Sparkles, Trash2, Upload } from "lucide-react";
+import { Database, FlaskConical, Loader2, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { api } from "@/lib/client/api";
 import type { DatasetView } from "@/lib/server/datasets";
@@ -8,6 +8,7 @@ import { Sprite } from "@/components/pixel/Sprite";
 import { ArcadeLabel, Button, IconButton } from "@/components/ui/primitives";
 import { useEditor } from "@/store/editor";
 import { DataStoryDialog } from "./DataStoryDialog";
+import { UpdateDialog } from "./UpdateDialog";
 
 export function DatasetsTab() {
   const project = useEditor((s) => s.project)!;
@@ -16,6 +17,7 @@ export function DatasetsTab() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<{ id: string; initial?: DatasetView } | null>(null);
+  const [updating, setUpdating] = useState<string | null>(null);
 
   const upload = async (file: File) => {
     setError(null);
@@ -96,15 +98,21 @@ export function DatasetsTab() {
                     <Trash2 className="size-3.5" />
                   </IconButton>
                 </div>
-                <Button variant="blue" className="mt-3 h-8 w-full text-sm" onClick={() => setOpen({ id: d.id })}>
-                  <Sparkles className="size-4" /> Generate story
-                </Button>
+                <div className="mt-3 grid grid-cols-2 gap-2.5">
+                  <Button variant="blue" className="h-8 px-2 text-sm" onClick={() => setOpen({ id: d.id })}>
+                    <Sparkles className="size-4" /> Story
+                  </Button>
+                  <Button className="h-8 px-2 text-sm" onClick={() => setUpdating(d.id)} title="Upload a new version and refresh only the affected scenes">
+                    <RefreshCw className="size-4" /> Update
+                  </Button>
+                </div>
               </li>
             );
           })}
         </ul>
       )}
       <DataStoryDialog datasetId={open?.id ?? null} initial={open?.initial} onClose={() => setOpen(null)} />
+      <UpdateDialog datasetId={updating} onClose={() => setUpdating(null)} />
     </div>
   );
 }
