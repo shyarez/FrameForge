@@ -1,7 +1,9 @@
 import "server-only";
+import { promises as fs } from "node:fs";
 import { nanoid } from "nanoid";
 import type { Project } from "@/lib/schema/project";
 import { probeVideo, renderProjectToMp4, type ProbeResult } from "./render";
+import { appendExportMetric } from "./metrics";
 import { exportFile } from "./storage";
 
 export type ExportStatus = "queued" | "launching" | "rendering" | "encoding" | "verifying" | "done" | "error";
@@ -51,10 +53,27 @@ export function startExport(project: Project, origin: string): ExportJob {
           job.totalFrames = p.totalFrames;
         },
       });
+      const renderedAt = Date.now();
       job.status = "verifying";
       job.probe = await probeVideo(out);
       if (!job.probe.decodedOk) throw new Error("Output failed decode verification");
       job.status = "done";
+      // Record measured performance for the evaluation panel; a metrics failure never fails the export.
+      const renderSec = (renderedAt - job.startedAt) / 1000;
+      const bytes = (await fs.stat(out).catch(() => null))?.size ?? 0;
+      await appendExportMetric(project.id, {
+        jobId: job.id,
+        at: new Date().toISOString(),
+        width: job.probe.width,
+        height: job.probe.height,
+        fps: job.probe.fps,
+        frames: job.totalFrames,
+        videoSec: job.probe.durationSec,
+        renderSec: Math.round(renderSec * 100) / 100,
+        totalSec: Math.round(((Date.now() - job.startedAt) / 1000) * 100) / 100,
+        framesPerSec: renderSec > 0 ? Math.round((job.totalFrames / renderSec) * 10) / 10 : 0,
+        bytes,
+      }).catch(() => undefined);
     } catch (err) {
       job.status = "error";
       job.error = err instanceof Error ? err.message : String(err);

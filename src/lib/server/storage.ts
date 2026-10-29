@@ -69,6 +69,7 @@ export async function deleteProject(id: string): Promise<void> {
   await fs.rm(projectFile(id), { force: true });
   await fs.rm(safePath("assets", assertId(id)), { recursive: true, force: true });
   await fs.rm(safePath("datasets", assertId(id)), { recursive: true, force: true });
+  await fs.rm(safePath("metrics", `${assertId(id)}.json`), { force: true });
 }
 
 export interface ProjectSummary {
