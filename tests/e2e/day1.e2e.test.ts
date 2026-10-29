@@ -19,12 +19,15 @@ beforeAll(async () => {
   browser = await chromium.launch({ executablePath: chromePath(), headless: true });
   page = await browser.newPage({ viewport: { width: 1600, height: 960 } });
 });
+let projectId = "";
+
 afterAll(async () => {
   await browser?.close();
+  // Leave no test projects behind (also removes their assets and datasets).
+  if (projectId) await fetch(`${BASE}/api/projects/${projectId}`, { method: "DELETE" }).catch(() => undefined);
 });
 
 describe("Day 1 vertical slice", () => {
-  let projectId = "";
 
   it("creates a project from the dashboard and opens the editor", async () => {
     await page.goto(BASE);

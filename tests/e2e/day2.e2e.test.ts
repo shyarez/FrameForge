@@ -39,6 +39,8 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await browser?.close();
+  // Leave no test projects behind (also removes their assets and datasets).
+  if (projectId) await fetch(`${BASE}/api/projects/${projectId}`, { method: "DELETE" }).catch(() => undefined);
 });
 
 describe("Day 2 editing", () => {
