@@ -103,7 +103,8 @@ export const ShapeElementSchema = ElementBase.extend({
 export const ImageElementSchema = ElementBase.extend({
   type: z.literal("image"),
   /** Asset reference: "asset:<fileName>" (project-local upload) or a data: URL. Never a filesystem path. */
-  src: z.string().max(10_000_000),
+  // Data URLs of the largest allowed upload (8 MB, ~11.2 MB as base64) must fit: exports inline images.
+  src: z.string().max(12_000_000),
   fit: z.enum(["cover", "contain"]),
   radius: z.number().min(0),
 });

@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import { nanoid } from "nanoid";
 import type { Project } from "@/lib/schema/project";
 import { probeVideo, renderProjectToMp4, type ProbeResult } from "./render";
+import { inlineAssets } from "./inlineAssets";
 import { appendExportMetric } from "./metrics";
 import { exportFile } from "./storage";
 
@@ -46,8 +47,10 @@ export function startExport(owner: string, project: Project, origin: string): Ex
     job.startedAt = Date.now();
     try {
       const out = exportFile(owner, job.id);
+      // Images are embedded so the render browser never needs the user's session.
+      const renderable = await inlineAssets(owner, project);
       await renderProjectToMp4({
-        project,
+        project: renderable,
         origin,
         outFile: out,
         onProgress: (p) => {
