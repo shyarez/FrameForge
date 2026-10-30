@@ -6,6 +6,10 @@ import { ProjectSchema, type Project } from "@/lib/schema/project";
 /**
  * Local JSON storage. Callers only ever pass validated IDs — never paths —
  * and every resolved path is checked to stay inside the data root.
+ *
+ * All user data lives under data/users/<ownerId>/ (projects, assets, datasets, metrics, exports).
+ * Every data function takes the owner as a required argument, so a forgotten ownership check is a
+ * compile error, and another user's project simply resolves to a path that does not exist (404).
  */
 
 const ID_RE = /^[A-Za-z0-9_-]{6,40}$/;
@@ -36,6 +40,11 @@ export function safePath(...segments: string[]): string {
   return full;
 }
 
+/** A path inside one user's data folder. */
+export function userPath(owner: string, ...segments: string[]): string {
+  return safePath("users", assertId(owner), ...segments);
+}
+
 async function writeAtomic(file: string, contents: string | Buffer) {
   await fs.mkdir(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
@@ -43,20 +52,20 @@ async function writeAtomic(file: string, contents: string | Buffer) {
   await fs.rename(tmp, file);
 }
 
-const projectFile = (id: string) => safePath("projects", `${assertId(id)}.json`);
+const projectFile = (owner: string, id: string) => userPath(owner, "projects", `${assertId(id)}.json`);
 
-export async function saveProject(input: unknown): Promise<Project> {
+export async function saveProject(owner: string, input: unknown): Promise<Project> {
   const parsed = ProjectSchema.safeParse(input);
   if (!parsed.success) throw new StorageError(`Invalid project: ${parsed.error.issues[0]?.path.join(".")} ${parsed.error.issues[0]?.message}`, 422);
   const project = { ...parsed.data, updatedAt: new Date().toISOString() };
-  await writeAtomic(projectFile(project.id), JSON.stringify(project, null, 2));
+  await writeAtomic(projectFile(owner, project.id), JSON.stringify(project, null, 2));
   return project;
 }
 
-export async function loadProject(id: string): Promise<Project> {
+export async function loadProject(owner: string, id: string): Promise<Project> {
   let raw: string;
   try {
-    raw = await fs.readFile(projectFile(id), "utf8");
+    raw = await fs.readFile(projectFile(owner, id), "utf8");
   } catch {
     throw new StorageError("Project not found", 404);
   }
@@ -65,11 +74,11 @@ export async function loadProject(id: string): Promise<Project> {
   return parsed.data;
 }
 
-export async function deleteProject(id: string): Promise<void> {
-  await fs.rm(projectFile(id), { force: true });
-  await fs.rm(safePath("assets", assertId(id)), { recursive: true, force: true });
-  await fs.rm(safePath("datasets", assertId(id)), { recursive: true, force: true });
-  await fs.rm(safePath("metrics", `${assertId(id)}.json`), { force: true });
+export async function deleteProject(owner: string, id: string): Promise<void> {
+  await fs.rm(projectFile(owner, id), { force: true });
+  await fs.rm(userPath(owner, "assets", assertId(id)), { recursive: true, force: true });
+  await fs.rm(userPath(owner, "datasets", assertId(id)), { recursive: true, force: true });
+  await fs.rm(userPath(owner, "metrics", `${assertId(id)}.json`), { force: true });
 }
 
 export interface ProjectSummary {
@@ -83,8 +92,8 @@ export interface ProjectSummary {
   firstScene: Project["scenes"][number];
 }
 
-export async function listProjects(): Promise<ProjectSummary[]> {
-  const dir = safePath("projects");
+export async function listProjects(owner: string): Promise<ProjectSummary[]> {
+  const dir = userPath(owner, "projects");
   let files: string[] = [];
   try {
     files = (await fs.readdir(dir)).filter((f) => f.endsWith(".json"));
@@ -94,7 +103,7 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   const out: ProjectSummary[] = [];
   for (const f of files) {
     try {
-      const p = await loadProject(f.slice(0, -5));
+      const p = await loadProject(owner, f.slice(0, -5));
       out.push({
         id: p.id,
         name: p.name,
@@ -111,4 +120,4 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
-export const exportFile = (jobId: string) => safePath("exports", `${assertId(jobId)}.mp4`);
+export const exportFile = (owner: string, jobId: string) => userPath(owner, "exports", `${assertId(jobId)}.mp4`);

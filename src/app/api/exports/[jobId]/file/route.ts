@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import { NextResponse } from "next/server";
 import { getJob } from "@/lib/server/exportJobs";
+import { requireUser } from "@/lib/server/auth";
 import { errorResponse } from "@/lib/server/http";
 import { assertId, exportFile } from "@/lib/server/storage";
 
@@ -8,11 +9,12 @@ type Ctx = { params: Promise<{ jobId: string }> };
 
 export async function GET(req: Request, { params }: Ctx) {
   try {
+    const user = await requireUser(req);
     const { jobId } = await params;
-    const file = exportFile(assertId(jobId));
+    const file = exportFile(user.id, assertId(jobId));
     const data = await fs.readFile(file).catch(() => null);
     if (!data) return NextResponse.json({ error: "Export file not found" }, { status: 404 });
-    const name = (getJob(jobId)?.projectName ?? "frameforge").replace(/[^\w.-]+/g, "_").slice(0, 60) || "frameforge";
+    const name = (getJob(user.id, jobId)?.projectName ?? "frameforge").replace(/[^\w.-]+/g, "_").slice(0, 60) || "frameforge";
     const download = new URL(req.url).searchParams.has("download");
     return new Response(new Uint8Array(data), {
       headers: {

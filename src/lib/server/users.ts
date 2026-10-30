@@ -109,7 +109,11 @@ export async function countUsers(): Promise<number> {
   return Object.keys(await readIndex()).length;
 }
 
-export async function createUser(emailInput: string, password: string): Promise<User> {
+/**
+ * Create an account. onFirstUser runs inside the registration lock when this is the very first
+ * account (used to adopt data created before accounts existed).
+ */
+export async function createUser(emailInput: string, password: string, onFirstUser?: (user: User) => Promise<unknown>): Promise<User> {
   const email = EmailSchema.safeParse(emailInput);
   if (!email.success) throw new StorageError(email.error.issues[0].message, 400);
   const pw = PasswordSchema.safeParse(password);
@@ -121,6 +125,7 @@ export async function createUser(emailInput: string, password: string): Promise<
     const user: User = { id: `usr_${nanoid(12)}`, email: email.data, passwordHash, createdAt: new Date().toISOString() };
     await writeAtomic(userFile(user.id), JSON.stringify(user, null, 2));
     await writeAtomic(indexFile(), JSON.stringify({ ...index, [email.data]: user.id }, null, 2));
+    if (Object.keys(index).length === 0 && onFirstUser) await onFirstUser(user);
     return user;
   });
 }

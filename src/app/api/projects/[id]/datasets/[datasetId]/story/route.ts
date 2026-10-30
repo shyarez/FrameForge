@@ -3,6 +3,7 @@ import { z } from "zod";
 import { generateStory } from "@/lib/data/story";
 import { AspectRatioSchema } from "@/lib/schema/project";
 import { loadDataset } from "@/lib/server/datasets";
+import { requireUser } from "@/lib/server/auth";
 import { errorResponse } from "@/lib/server/http";
 import { assertId, StorageError } from "@/lib/server/storage";
 
@@ -18,10 +19,11 @@ const Body = z.object({
 /** Generate an editable story from the stored dataset version. All numbers are computed here. */
 export async function POST(req: Request, { params }: Ctx) {
   try {
+    const user = await requireUser(req);
     const { id, datasetId } = await params;
     const body = Body.safeParse(await req.json().catch(() => null));
     if (!body.success) throw new StorageError("Invalid story request", 400);
-    const { meta, table, version, hash } = await loadDataset(assertId(id), datasetId, body.data.version);
+    const { meta, table, version, hash } = await loadDataset(user.id, assertId(id), datasetId, body.data.version);
     try {
       const story = generateStory(table, { id: meta.id, name: meta.name, version, hash }, body.data.roles, body.data.aspectRatio, { now: new Date().toISOString() });
       return NextResponse.json({ story });

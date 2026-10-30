@@ -3,6 +3,7 @@ import { z } from "zod";
 import { planUpdate } from "@/lib/data/update";
 import { ProjectSchema } from "@/lib/schema/project";
 import { loadDataset } from "@/lib/server/datasets";
+import { requireUser } from "@/lib/server/auth";
 import { errorResponse } from "@/lib/server/http";
 import { assertId, StorageError } from "@/lib/server/storage";
 
@@ -17,11 +18,12 @@ const Body = z.object({ project: ProjectSchema });
  */
 export async function POST(req: Request, { params }: Ctx) {
   try {
+    const user = await requireUser(req);
     const { id, datasetId } = await params;
     const body = Body.safeParse(await req.json().catch(() => null));
     if (!body.success) throw new StorageError("Invalid update request", 400);
     if (body.data.project.id !== assertId(id)) throw new StorageError("Project id mismatch", 400);
-    const { meta, table, version, hash } = await loadDataset(id, assertId(datasetId));
+    const { meta, table, version, hash } = await loadDataset(user.id, id, assertId(datasetId));
     const v = meta.versions.find((x) => x.version === version)!;
     const { project, report } = planUpdate(body.data.project, datasetId, table, { version, hash, rowCount: v.rowCount, columnCount: v.columnCount }, new Date().toISOString());
     return NextResponse.json({ project, report });

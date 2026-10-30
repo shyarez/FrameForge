@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import { deleteAsset, readAsset } from "@/lib/server/assets";
+import { requireUser } from "@/lib/server/auth";
 import { errorResponse } from "@/lib/server/http";
 import { assertId } from "@/lib/server/storage";
 
 type Ctx = { params: Promise<{ id: string; file: string }> };
 
-export async function GET(_req: Request, { params }: Ctx) {
+export async function GET(req: Request, { params }: Ctx) {
   try {
+    const user = await requireUser(req);
     const { id, file } = await params;
-    const { data, mime } = await readAsset(assertId(id), file);
+    const { data, mime } = await readAsset(user.id, assertId(id), file);
     return new Response(new Uint8Array(data), {
       headers: {
         "Content-Type": mime,
@@ -23,10 +25,11 @@ export async function GET(_req: Request, { params }: Ctx) {
   }
 }
 
-export async function DELETE(_req: Request, { params }: Ctx) {
+export async function DELETE(req: Request, { params }: Ctx) {
   try {
+    const user = await requireUser(req);
     const { id, file } = await params;
-    await deleteAsset(assertId(id), file);
+    await deleteAsset(user.id, assertId(id), file);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return errorResponse(err);

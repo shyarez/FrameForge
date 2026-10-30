@@ -1,7 +1,7 @@
 import "server-only";
 import { promises as fs } from "node:fs";
 import { nanoid } from "nanoid";
-import { assertId, safePath, StorageError } from "./storage";
+import { assertId, userPath, StorageError } from "./storage";
 
 /**
  * Project image assets. Files are identified by their content (magic bytes), never by the
@@ -36,8 +36,8 @@ export function assertAssetName(name: string): string {
   return name;
 }
 
-const assetDir = (projectId: string) => safePath("assets", assertId(projectId));
-const assetPath = (projectId: string, name: string) => safePath("assets", assertId(projectId), assertAssetName(name));
+const assetDir = (owner: string, projectId: string) => userPath(owner, "assets", assertId(projectId));
+const assetPath = (owner: string, projectId: string, name: string) => userPath(owner, "assets", assertId(projectId), assertAssetName(name));
 
 export interface AssetInfo {
   name: string;
@@ -47,40 +47,40 @@ export interface AssetInfo {
   kind: ImageKind;
 }
 
-export async function saveAsset(projectId: string, data: Uint8Array): Promise<AssetInfo> {
+export async function saveAsset(owner: string, projectId: string, data: Uint8Array): Promise<AssetInfo> {
   if (data.byteLength === 0) throw new StorageError("Empty file", 400);
   if (data.byteLength > MAX_ASSET_BYTES) throw new StorageError("Image is larger than 8 MB", 413);
   const kind = sniffImage(data);
   if (!kind) throw new StorageError("Unsupported file: upload a PNG, JPEG, GIF or WebP image", 415);
   const name = `img_${nanoid(12)}.${kind}`;
-  await fs.mkdir(assetDir(projectId), { recursive: true });
-  await fs.writeFile(assetPath(projectId, name), data);
+  await fs.mkdir(assetDir(owner, projectId), { recursive: true });
+  await fs.writeFile(assetPath(owner, projectId, name), data);
   return { name, ref: `asset:${name}`, bytes: data.byteLength, kind };
 }
 
-export async function listAssets(projectId: string): Promise<AssetInfo[]> {
+export async function listAssets(owner: string, projectId: string): Promise<AssetInfo[]> {
   let names: string[];
   try {
-    names = await fs.readdir(assetDir(projectId));
+    names = await fs.readdir(assetDir(owner, projectId));
   } catch {
     return [];
   }
   const out: AssetInfo[] = [];
   for (const name of names.filter((n) => FILE_RE.test(n))) {
-    const stat = await fs.stat(assetPath(projectId, name));
+    const stat = await fs.stat(assetPath(owner, projectId, name));
     out.push({ name, ref: `asset:${name}`, bytes: stat.size, kind: name.split(".").pop() as ImageKind });
   }
   return out;
 }
 
-export async function readAsset(projectId: string, name: string): Promise<{ data: Buffer; mime: string }> {
-  const data = await fs.readFile(assetPath(projectId, name)).catch(() => null);
+export async function readAsset(owner: string, projectId: string, name: string): Promise<{ data: Buffer; mime: string }> {
+  const data = await fs.readFile(assetPath(owner, projectId, name)).catch(() => null);
   if (!data) throw new StorageError("Asset not found", 404);
   const kind = sniffImage(data);
   if (!kind) throw new StorageError("Stored asset is not a valid image", 500);
   return { data, mime: MIME[kind] };
 }
 
-export async function deleteAsset(projectId: string, name: string): Promise<void> {
-  await fs.rm(assetPath(projectId, name), { force: true });
+export async function deleteAsset(owner: string, projectId: string, name: string): Promise<void> {
+  await fs.rm(assetPath(owner, projectId, name), { force: true });
 }

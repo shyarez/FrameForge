@@ -6,7 +6,7 @@ import { CsvError, parseCsv } from "@/lib/data/csv";
 import { profileTable, type ColumnProfile, type Table } from "@/lib/data/profile";
 import { suggestRoles, type StoryRoles } from "@/lib/data/story";
 import type { DatasetRef } from "@/lib/schema/project";
-import { assertId, safePath, StorageError } from "./storage";
+import { assertId, userPath, StorageError } from "./storage";
 
 /**
  * Datasets are stored per project and per version: data/datasets/<project>/<dataset>/v<N>.csv
@@ -40,9 +40,9 @@ export interface DatasetView {
   suggested: StoryRoles;
 }
 
-const dir = (projectId: string, datasetId: string) => safePath("datasets", assertId(projectId), assertId(datasetId));
-const versionFile = (projectId: string, datasetId: string, v: number) => safePath("datasets", assertId(projectId), assertId(datasetId), `v${Math.trunc(v)}.csv`);
-const metaFile = (projectId: string, datasetId: string) => safePath("datasets", assertId(projectId), assertId(datasetId), "meta.json");
+const dir = (owner: string, projectId: string, datasetId: string) => userPath(owner, "datasets", assertId(projectId), assertId(datasetId));
+const versionFile = (owner: string, projectId: string, datasetId: string, v: number) => userPath(owner, "datasets", assertId(projectId), assertId(datasetId), `v${Math.trunc(v)}.csv`);
+const metaFile = (owner: string, projectId: string, datasetId: string) => userPath(owner, "datasets", assertId(projectId), assertId(datasetId), "meta.json");
 
 export const hashCsv = (normalized: string) => createHash("sha256").update(normalized, "utf8").digest("hex");
 
@@ -58,8 +58,8 @@ function parseOrReject(text: string) {
   }
 }
 
-async function readMeta(projectId: string, datasetId: string): Promise<DatasetMeta> {
-  const raw = await fs.readFile(metaFile(projectId, datasetId), "utf8").catch(() => null);
+async function readMeta(owner: string, projectId: string, datasetId: string): Promise<DatasetMeta> {
+  const raw = await fs.readFile(metaFile(owner, projectId, datasetId), "utf8").catch(() => null);
   if (!raw) throw new StorageError("Dataset not found", 404);
   return JSON.parse(raw) as DatasetMeta;
 }
@@ -80,7 +80,7 @@ function view(meta: DatasetMeta, table: Table, preview: string[][], warnings: st
   };
 }
 
-export async function createDataset(projectId: string, fileName: string, text: string): Promise<DatasetView> {
+export async function createDataset(owner: string, projectId: string, fileName: string, text: string): Promise<DatasetView> {
   const parsed = parseOrReject(text);
   const table = profileTable(parsed.headers, parsed.rows);
   const id = `ds_${nanoid(10)}`;
@@ -91,9 +91,9 @@ export async function createDataset(projectId: string, fileName: string, text: s
     current: 1,
     versions: [{ version: 1, hash: hashCsv(parsed.normalized), rowCount: table.rowCount, columnCount: parsed.headers.length, uploadedAt: now, warnings: parsed.warnings }],
   };
-  await fs.mkdir(dir(projectId, id), { recursive: true });
-  await fs.writeFile(versionFile(projectId, id, 1), parsed.normalized, "utf8");
-  await fs.writeFile(metaFile(projectId, id), JSON.stringify(meta, null, 2), "utf8");
+  await fs.mkdir(dir(owner, projectId, id), { recursive: true });
+  await fs.writeFile(versionFile(owner, projectId, id, 1), parsed.normalized, "utf8");
+  await fs.writeFile(metaFile(owner, projectId, id), JSON.stringify(meta, null, 2), "utf8");
   return view(meta, table, parsed.rows.slice(0, 25), parsed.warnings);
 }
 
@@ -101,8 +101,8 @@ export async function createDataset(projectId: string, fileName: string, text: s
  * Store a replacement CSV as the next version of an existing dataset. An upload identical to the
  * current version (same normalised hash) does not create a new version.
  */
-export async function addDatasetVersion(projectId: string, datasetId: string, text: string): Promise<{ view: DatasetView; identical: boolean }> {
-  const meta = await readMeta(projectId, datasetId);
+export async function addDatasetVersion(owner: string, projectId: string, datasetId: string, text: string): Promise<{ view: DatasetView; identical: boolean }> {
+  const meta = await readMeta(owner, projectId, datasetId);
   const parsed = parseOrReject(text);
   const hash = hashCsv(parsed.normalized);
   const current = meta.versions.find((v) => v.version === meta.current)!;
@@ -112,24 +112,24 @@ export async function addDatasetVersion(projectId: string, datasetId: string, te
   }
   const table = profileTable(parsed.headers, parsed.rows);
   const version = Math.max(...meta.versions.map((v) => v.version)) + 1;
-  await fs.writeFile(versionFile(projectId, datasetId, version), parsed.normalized, "utf8");
+  await fs.writeFile(versionFile(owner, projectId, datasetId, version), parsed.normalized, "utf8");
   meta.versions.push({ version, hash, rowCount: table.rowCount, columnCount: parsed.headers.length, uploadedAt: new Date().toISOString(), warnings: parsed.warnings });
   meta.current = version;
-  await fs.writeFile(metaFile(projectId, datasetId), JSON.stringify(meta, null, 2), "utf8");
+  await fs.writeFile(metaFile(owner, projectId, datasetId), JSON.stringify(meta, null, 2), "utf8");
   return { view: view(meta, table, parsed.rows.slice(0, 25), parsed.warnings), identical: false };
 }
 
 /** Load a stored version (current by default) as a profiled table. */
-export async function loadDataset(projectId: string, datasetId: string, version?: number) {
-  const meta = await readMeta(projectId, datasetId);
+export async function loadDataset(owner: string, projectId: string, datasetId: string, version?: number) {
+  const meta = await readMeta(owner, projectId, datasetId);
   const v = version ?? meta.current;
   if (!meta.versions.some((x) => x.version === v)) throw new StorageError("Dataset version not found", 404);
-  const text = await fs.readFile(versionFile(projectId, datasetId, v), "utf8");
+  const text = await fs.readFile(versionFile(owner, projectId, datasetId, v), "utf8");
   const parsed = parseOrReject(text);
   const table = profileTable(parsed.headers, parsed.rows);
   return { meta, table, version: v, hash: meta.versions.find((x) => x.version === v)!.hash, view: view(meta, table, parsed.rows.slice(0, 25), parsed.warnings) };
 }
 
-export async function deleteDataset(projectId: string, datasetId: string) {
-  await fs.rm(dir(projectId, datasetId), { recursive: true, force: true });
+export async function deleteDataset(owner: string, projectId: string, datasetId: string) {
+  await fs.rm(dir(owner, projectId, datasetId), { recursive: true, force: true });
 }

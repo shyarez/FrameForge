@@ -10,6 +10,8 @@ export type ExportStatus = "queued" | "launching" | "rendering" | "encoding" | "
 
 export interface ExportJob {
   id: string;
+  /** The user who started the export; only they can see its status or download it. */
+  ownerId: string;
   projectId: string;
   projectName: string;
   status: ExportStatus;
@@ -27,9 +29,10 @@ const g = globalThis as unknown as { __ffJobs?: Map<string, ExportJob>; __ffQueu
 const jobs = (g.__ffJobs ??= new Map());
 
 /** Exports run one at a time: each owns a Chromium instance and an FFmpeg process. */
-export function startExport(project: Project, origin: string): ExportJob {
+export function startExport(owner: string, project: Project, origin: string): ExportJob {
   const job: ExportJob = {
     id: `exp_${nanoid(12)}`,
+    ownerId: owner,
     projectId: project.id,
     projectName: project.name,
     status: "queued",
@@ -42,7 +45,7 @@ export function startExport(project: Project, origin: string): ExportJob {
   const run = async () => {
     job.startedAt = Date.now();
     try {
-      const out = exportFile(job.id);
+      const out = exportFile(owner, job.id);
       await renderProjectToMp4({
         project,
         origin,
@@ -61,7 +64,7 @@ export function startExport(project: Project, origin: string): ExportJob {
       // Record measured performance for the evaluation panel; a metrics failure never fails the export.
       const renderSec = (renderedAt - job.startedAt) / 1000;
       const bytes = (await fs.stat(out).catch(() => null))?.size ?? 0;
-      await appendExportMetric(project.id, {
+      await appendExportMetric(owner, project.id, {
         jobId: job.id,
         at: new Date().toISOString(),
         width: job.probe.width,
@@ -85,4 +88,8 @@ export function startExport(project: Project, origin: string): ExportJob {
   return job;
 }
 
-export const getJob = (id: string) => jobs.get(id);
+/** A job, only if it belongs to this user (anything else is reported as not found). */
+export const getJob = (owner: string, id: string): ExportJob | undefined => {
+  const job = jobs.get(id);
+  return job && job.ownerId === owner ? job : undefined;
+};

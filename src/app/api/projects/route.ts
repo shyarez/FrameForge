@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createProject } from "@/lib/schema/factory";
 import { AspectRatioSchema } from "@/lib/schema/project";
+import { requireUser } from "@/lib/server/auth";
 import { errorResponse } from "@/lib/server/http";
 import { listProjects, saveProject } from "@/lib/server/storage";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    return NextResponse.json({ projects: await listProjects() });
+    const user = await requireUser(req);
+    return NextResponse.json({ projects: await listProjects(user.id) });
   } catch (err) {
     return errorResponse(err);
   }
@@ -21,9 +23,10 @@ const CreateBody = z.object({
 
 export async function POST(req: Request) {
   try {
+    const user = await requireUser(req);
     const body = CreateBody.safeParse(await req.json().catch(() => ({})));
     if (!body.success) return NextResponse.json({ error: "Invalid create request" }, { status: 400 });
-    const project = await saveProject(createProject(body.data.name, body.data.aspectRatio, body.data.template));
+    const project = await saveProject(user.id, createProject(body.data.name, body.data.aspectRatio, body.data.template));
     return NextResponse.json({ project }, { status: 201 });
   } catch (err) {
     return errorResponse(err);

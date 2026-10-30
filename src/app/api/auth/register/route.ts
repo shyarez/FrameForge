@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isCrossSite, signIn } from "@/lib/server/auth";
 import { errorResponse } from "@/lib/server/http";
+import { adoptLegacyData } from "@/lib/server/migrate";
 import { clientKey, hit } from "@/lib/server/rateLimit";
 import { StorageError } from "@/lib/server/storage";
 import { createUser, toPublic } from "@/lib/server/users";
@@ -13,7 +14,8 @@ export async function POST(req: Request) {
     if (!limit.ok) return NextResponse.json({ error: "Too many sign-ups. Try again later." }, { status: 429, headers: { "Retry-After": String(limit.retryAfter) } });
     const body = (await req.json().catch(() => null)) as { email?: unknown; password?: unknown } | null;
     if (typeof body?.email !== "string" || typeof body?.password !== "string") throw new StorageError("Email and password are required", 400);
-    const user = await createUser(body.email, body.password);
+    // The first account adopts any projects created before accounts existed.
+    const user = await createUser(body.email, body.password, (u) => adoptLegacyData(u.id));
     await signIn(user.id);
     return NextResponse.json({ user: toPublic(user) }, { status: 201 });
   } catch (err) {
