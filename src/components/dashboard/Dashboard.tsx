@@ -17,6 +17,7 @@ import { Sprite } from "@/components/pixel/Sprite";
 import type { SpriteName } from "@/components/pixel/sprites";
 import { ArcadeLabel, Button, Field, IconButton, Select, TextInput, cx } from "@/components/ui/primitives";
 import { ThemeToggle, useTheme } from "@/components/theme/theme";
+import { UserMenu } from "@/components/auth/UserMenu";
 import { PhaseButton, useOceanPhase } from "./OceanClock";
 import { SURFACES, surfaceVars, surfacesAt } from "./phaseSurfaces";
 
@@ -251,7 +252,8 @@ export function Dashboard() {
             <a href="#projects" className="hover:text-paper">Projects</a>
             <a href="#templates" className="hover:text-paper">Templates</a>
           </div>
-          <ThemeToggle className="ml-auto" />
+          <div className="ml-auto"><UserMenu /></div>
+          <ThemeToggle />
           <Button variant="primary" onClick={() => setCreating("launch")}>
             <Plus className="size-4" /> New project
           </Button>

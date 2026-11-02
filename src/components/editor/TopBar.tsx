@@ -7,6 +7,7 @@ import { AspectRatioSchema, type AspectRatio } from "@/lib/schema/project";
 import { Logo } from "@/components/brand/Logo";
 import { Button, IconButton, Select } from "@/components/ui/primitives";
 import { ThemeToggle } from "@/components/theme/theme";
+import { UserMenu } from "@/components/auth/UserMenu";
 import { useEditor } from "@/store/editor";
 
 function SaveIndicator() {
@@ -59,6 +60,7 @@ export function TopBar({ onSave, onExport, onEvaluate }: { onSave: () => void; o
           ))}
         </Select>
         <ThemeToggle />
+        <UserMenu compact />
         <Button onClick={onSave} title="Save (Ctrl+S)"><Save className="size-4" /> Save</Button>
         <Button onClick={onEvaluate} title="Check claims, evidence coverage, updates and export performance"><Gauge className="size-4" /> Evaluate</Button>
         <Button variant="primary" onClick={onExport}><Film className="size-4" /> Export</Button>

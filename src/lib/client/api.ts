@@ -8,11 +8,36 @@ import type { UpdateReport } from "@/lib/data/update";
 import type { AuditReport } from "@/lib/data/audit";
 import type { ExportMetric } from "@/lib/server/metrics";
 
+import type { PublicUser } from "@/lib/server/users";
+
+/** Only same-site relative paths are allowed as a post-login destination (no open redirects). */
+export function safeNext(next: string | null | undefined): string {
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
+}
+
+/** Send a signed-out user to the sign-in page, returning here afterwards. */
+function toLogin() {
+  if (typeof window === "undefined" || window.location.pathname.startsWith("/login") || window.location.pathname.startsWith("/signup")) return;
+  // Called from data helpers outside React, where no router exists; a full load also drops stale state.
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+  window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+}
+
 async function json<T>(res: Response): Promise<T> {
   const body = await res.json().catch(() => ({}));
+  if (res.status === 401 && !res.url.includes("/api/auth/")) toLogin();
   if (!res.ok) throw new Error(body?.error ?? `Request failed (${res.status})`);
   return body as T;
 }
+
+const postJson = (url: string, body: unknown) => fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+
+export const auth = {
+  me: () => fetch("/api/auth/me", { cache: "no-store" }).then((r) => (r.ok ? (r.json() as Promise<{ user: PublicUser }>) : null)),
+  login: (email: string, password: string) => postJson("/api/auth/login", { email, password }).then((r) => json<{ user: PublicUser }>(r)),
+  register: (email: string, password: string) => postJson("/api/auth/register", { email, password }).then((r) => json<{ user: PublicUser }>(r)),
+  logout: () => postJson("/api/auth/logout", {}).then((r) => json<{ ok: true }>(r)),
+};
 
 export const api = {
   listProjects: () => fetch("/api/projects", { cache: "no-store" }).then((r) => json<{ projects: ProjectSummary[] }>(r)),
