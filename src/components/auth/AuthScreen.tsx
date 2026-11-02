@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Eye, EyeOff, LogIn, UserPlus } from "lucide-react";
+import { Eye, EyeOff, LogIn, Terminal, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -26,14 +26,30 @@ export function AuthScreen({ mode }: { mode: Mode }) {
   const [error, setError] = useState<string | null>(null);
   const signup = mode === "signup";
 
-  // Already signed in? Go straight on.
+  const [devEnabled, setDevEnabled] = useState(false);
+
+  // Already signed in? Go straight on. Also check whether the local developer shortcut is on.
   useEffect(() => {
     let cancelled = false;
     auth.me().then((r) => !cancelled && r && router.replace(next));
+    auth.devLoginEnabled().then((on) => !cancelled && setDevEnabled(on), () => undefined);
     return () => {
       cancelled = true;
     };
   }, [router, next]);
+
+  const devSignIn = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await auth.devLogin();
+      router.replace(next);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,6 +113,15 @@ export function AuthScreen({ mode }: { mode: Mode }) {
             {busy ? (signup ? "Creating account…" : "Signing in…") : signup ? "Create account" : "Sign in"}
           </Button>
         </form>
+
+        {devEnabled && (
+          <div className="mt-5 border-t-2 border-dashed border-line pt-4">
+            <Button type="button" onClick={() => void devSignIn()} disabled={busy} className="h-10 w-full">
+              <Terminal className="size-4" /> Continue as developer
+            </Button>
+            <p className="mt-2 text-center text-[11px] text-mute">Local development only (FF_DEV_LOGIN=1). Signs in as dev@frameforge.local.</p>
+          </div>
+        )}
 
         <p className="mt-5 text-center text-sm text-mute">
           {signup ? "Already have an account? " : "New to FrameForge? "}

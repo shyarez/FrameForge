@@ -37,6 +37,9 @@ export const auth = {
   login: (email: string, password: string) => postJson("/api/auth/login", { email, password }).then((r) => json<{ user: PublicUser }>(r)),
   register: (email: string, password: string) => postJson("/api/auth/register", { email, password }).then((r) => json<{ user: PublicUser }>(r)),
   logout: () => postJson("/api/auth/logout", {}).then((r) => json<{ ok: true }>(r)),
+  /** Whether the development-only shortcut is available on this machine. */
+  devLoginEnabled: () => fetch("/api/auth/dev-login", { cache: "no-store" }).then((r) => (r.ok ? r.json() : { enabled: false })).then((b: { enabled: boolean }) => b.enabled),
+  devLogin: () => postJson("/api/auth/dev-login", {}).then((r) => json<{ user: PublicUser }>(r)),
 };
 
 export const api = {
