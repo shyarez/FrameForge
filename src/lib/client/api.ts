@@ -9,6 +9,9 @@ import type { AuditReport } from "@/lib/data/audit";
 import type { ExportMetric } from "@/lib/server/metrics";
 
 import type { PublicUser } from "@/lib/server/users";
+import type { Voice, VoiceStatus } from "@/lib/server/voice";
+import type { WriterStatus } from "@/lib/server/writer";
+import type { CaptionCue, Transcript } from "@/lib/engine/narration";
 
 /** Only same-site relative paths are allowed as a post-login destination (no open redirects). */
 export function safeNext(next: string | null | undefined): string {
@@ -97,5 +100,20 @@ export const api = {
     }).then((r) => json<{ project: Project; report: UpdateReport }>(r)),
   getEvaluation: (projectId: string) =>
     fetch(`/api/projects/${encodeURIComponent(projectId)}/evaluation`, { cache: "no-store" }).then((r) => json<{ audit: AuditReport; exports: ExportMetric[] }>(r)),
+  voiceStatus: () => fetch("/api/voice/status", { cache: "no-store" }).then((r) => json<{ voice: VoiceStatus; writer: WriterStatus }>(r)),
+  listVoices: () => fetch("/api/voice/voices", { cache: "no-store" }).then((r) => json<{ voices: Voice[] }>(r)),
+  cloneVoice: (name: string, file: File, text?: string) => {
+    const form = new FormData();
+    form.append("name", name);
+    form.append("file", file);
+    if (text) form.append("text", text);
+    return fetch("/api/voice/clone", { method: "POST", body: form }).then((r) => json<{ voice: Voice }>(r));
+  },
+  speak: (projectId: string, body: { text: string; voice: string; speed: number; language?: string; description?: string }) =>
+    postJson(`/api/projects/${encodeURIComponent(projectId)}/voice/speak`, body).then((r) => json<{ asset: AssetInfo }>(r)),
+  transcribe: (projectId: string, asset: string, language?: string) =>
+    postJson(`/api/projects/${encodeURIComponent(projectId)}/voice/transcribe`, { asset, language }).then((r) => json<{ transcript: Transcript; cues: CaptionCue[] }>(r)),
+  writeNarration: (projectId: string, text: string, style?: string) =>
+    postJson(`/api/projects/${encodeURIComponent(projectId)}/voice/write`, { text, style }).then((r) => json<{ text: string }>(r)),
   exportFileUrl: (jobId: string, download = false) => `/api/exports/${encodeURIComponent(jobId)}/file${download ? "?download=1" : ""}`,
 };

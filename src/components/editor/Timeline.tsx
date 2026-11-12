@@ -4,7 +4,8 @@ import { ChevronLeft, ChevronRight, Copy, Pause, Play, Plus, SkipBack, Trash2 } 
 import { useMemo, useRef } from "react";
 import { evaluateProject, evaluateScene, sceneRestTime, sceneStartTimes } from "@/lib/engine/evaluate";
 import { CANVAS_SIZES, projectDurationMs, type Project, type Scene } from "@/lib/schema/project";
-import { SceneView } from "@/components/render/SceneView";
+import { resolveAssetSrc, SceneView } from "@/components/render/SceneView";
+import { Waveform } from "./Waveform";
 import { IconButton, cx } from "@/components/ui/primitives";
 import { useEditor } from "@/store/editor";
 
@@ -26,6 +27,25 @@ function SceneThumb({ project, scene }: { project: Project; scene: Scene }) {
       <div style={{ transform: `scale(${scale})`, transformOrigin: "0 0" }}>
         <SceneView state={state} width={logical.width} height={logical.height} projectId={project.id} />
       </div>
+    </div>
+  );
+}
+
+/** Background music lane under the scenes (one waveform per repeat when looping). */
+function MusicStrip({ project, pxPerMs }: { project: Project; pxPerMs: number }) {
+  const m = project.music!;
+  const total = projectDurationMs(project);
+  const playMs = m.loop ? total : Math.min(total, m.durationMs);
+  const url = resolveAssetSrc(project.id, m.src);
+  const repeats = Math.ceil(playMs / m.durationMs);
+  // Scene cards are separated by 6 px gaps, so the lane is stretched to the same overall width.
+  const width = playMs * pxPerMs + (project.scenes.length - 1) * 6 * (playMs / total);
+  return (
+    <div className="mt-1 flex h-2.5 overflow-hidden bg-yellow/15 text-yellow-ink" style={{ width }} title={`Music · ${m.loop ? "looping" : "plays once"}`}>
+      {Array.from({ length: Math.min(repeats, 50) }, (_, i) => {
+        const ms = Math.min(m.durationMs, playMs - i * m.durationMs);
+        return <Waveform key={i} url={url} showFraction={ms / m.durationMs} className="h-full shrink-0 border-r border-yellow/40" style={{ width: (ms / playMs) * width }} />;
+      })}
     </div>
   );
 }
@@ -140,7 +160,7 @@ export function Timeline() {
       <div className="scroll-thin relative flex-1 overflow-x-auto overflow-y-hidden px-4 pt-1 pb-3">
         <div
           ref={trackRef}
-          className="relative flex h-full gap-1.5"
+          className={cx("relative flex gap-1.5", project.music ? "h-[calc(100%-14px)]" : "h-full")}
           style={{ width: Math.max(total * pxPerMs, 100) + project.scenes.length * 6 }}
           onPointerDown={(e) => {
             // Clicking the empty ruler area seeks.
@@ -168,6 +188,22 @@ export function Timeline() {
                 <span className="shrink-0 font-mono text-mute">{(scene.durationMs / 1000).toFixed(1)}s</span>
               </div>
               <SceneThumb project={project} scene={scene} />
+              {scene.narration && (
+                <span
+                  className="absolute bottom-1 h-3.5 overflow-hidden bg-mint/20 text-mint-ink"
+                  style={{
+                    left: 6 + scene.narration.offsetMs * pxPerMs,
+                    width: Math.max(2, Math.min(scene.narration.durationMs, scene.durationMs - scene.narration.offsetMs) * pxPerMs - 6),
+                  }}
+                  title={`Narration · ${fmtTime(scene.narration.durationMs)}`}
+                >
+                  <Waveform
+                    url={resolveAssetSrc(project.id, scene.narration.src)}
+                    showFraction={Math.min(1, (scene.durationMs - scene.narration.offsetMs) / scene.narration.durationMs)}
+                    className="size-full"
+                  />
+                </span>
+              )}
               {scene.stale && (
                 <span className="absolute right-1.5 bottom-1.5 bg-coral px-1 py-0.5" title={scene.stale.reasons.join("\n")}>
                   <span className="font-arcade text-[7px] text-onaccent uppercase">Stale</span>
@@ -187,6 +223,7 @@ export function Timeline() {
             <div className="absolute -top-1 -left-[5px] size-[13px] bg-coral [clip-path:polygon(0_0,100%_0,100%_60%,50%_100%,0_60%)]" />
           </div>
         </div>
+        {project.music && <MusicStrip project={project} pxPerMs={pxPerMs} />}
       </div>
     </div>
   );

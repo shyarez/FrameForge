@@ -7,6 +7,7 @@ import { projectDurationMs } from "@/lib/schema/project";
 import { Sprite } from "@/components/pixel/Sprite";
 import { ArcadeLabel } from "@/components/ui/primitives";
 import { useEditor } from "@/store/editor";
+import { AudioPreview } from "./AudioPreview";
 import { CanvasStage } from "./CanvasStage";
 import { EvaluationDialog } from "./EvaluationDialog";
 import { ExportDialog } from "./ExportDialog";
@@ -195,6 +196,7 @@ export function EditorApp({ projectId }: { projectId: string }) {
       <Timeline />
       <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} save={save} />
       <EvaluationDialog open={evalOpen} onClose={() => setEvalOpen(false)} save={save} />
+      <AudioPreview />
     </div>
   );
 }

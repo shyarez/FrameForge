@@ -5,7 +5,7 @@ import { createElement, createScene, newId } from "@/lib/schema/factory";
 import { sceneRestTime, sceneStartTimes } from "@/lib/engine/evaluate";
 import type { AssetInfo } from "@/lib/server/assets";
 import type { Story } from "@/lib/data/story";
-import type { DatasetRef } from "@/lib/schema/project";
+import type { DatasetRef, Music, Narration } from "@/lib/schema/project";
 import { projectDurationMs, type AspectRatio, type ElementType, type Project, type Scene, type SceneElement } from "@/lib/schema/project";
 
 /**
@@ -73,7 +73,17 @@ interface EditorState {
   duplicateElement(id: string): void;
   copyElement(id: string): void;
   pasteElement(): void;
+  /** Set or clear a scene's voice-over. */
+  setNarration(sceneId: string, narration: Narration | undefined): void;
+  /** Lengthen or shorten a scene so its voice-over fits, with a short tail of silence. */
+  fitSceneToNarration(sceneId: string): void;
+  setMusic(music: Music | undefined): void;
+  /** Replace a scene's generated captions (elements with role "caption") in one undo step. */
+  setCaptions(sceneId: string, captions: SceneElement[]): void;
 }
+
+/** Silence kept after a voice-over when a scene is fitted to it. */
+export const NARRATION_TAIL_MS = 400;
 
 const clone = <T,>(v: T): T => structuredClone(v);
 
@@ -358,6 +368,35 @@ export const useEditor = create<EditorState>()((set, get) => {
       // Next paste cascades further rather than stacking exactly on top.
       set({ selectedElementId: el.id, clipboard: { ...clipboard, x: el.x, y: el.y } });
       seekRest();
+    },
+    setNarration(sceneId, narration) {
+      commit((d) => {
+        const s = findScene(d, sceneId);
+        if (!s) return;
+        if (narration) s.narration = narration;
+        else delete s.narration;
+      });
+    },
+    fitSceneToNarration(sceneId) {
+      commit((d) => {
+        const s = findScene(d, sceneId);
+        if (!s?.narration) return;
+        const ms = Math.ceil((s.narration.offsetMs + s.narration.durationMs + NARRATION_TAIL_MS) / 100) * 100;
+        s.durationMs = Math.min(120_000, Math.max(500, ms));
+      });
+    },
+    setCaptions(sceneId, captions) {
+      commit((d) => {
+        const s = findScene(d, sceneId);
+        if (s) s.elements = [...s.elements.filter((e) => e.role !== "caption"), ...captions];
+      });
+      if (get().selectedElementId && !findElement(get().project!, get().selectedElementId)) set({ selectedElementId: null });
+    },
+    setMusic(music) {
+      commit((d) => {
+        if (music) d.music = music;
+        else delete d.music;
+      });
     },
     reorderElement(id, dir) {
       commit((d) => {

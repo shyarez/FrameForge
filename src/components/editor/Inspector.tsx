@@ -14,7 +14,11 @@ import {
   type SceneElement,
 } from "@/lib/schema/project";
 import { Button, Field, IconButton, Select, TextInput, cx } from "@/components/ui/primitives";
+import type { AssetInfo } from "@/lib/server/assets";
+import { DEFAULT_MUSIC } from "./AssetsTab";
 import { EvidenceInspector } from "./EvidenceInspector";
+import { fmtTime } from "./Timeline";
+import { VoicePanel } from "./VoicePanel";
 import { findElement, findScene, useEditor } from "@/store/editor";
 
 /** Number field that commits on blur/Enter so typing doesn't spam undo history. */
@@ -121,7 +125,7 @@ function ChartDataEditor({ el, update }: { el: ChartElement; update: (p: Partial
 }
 
 function ImageFields({ el, update, styleUpdate }: { el: ImageElement; update: (p: Partial<SceneElement>) => void; styleUpdate: (p: Partial<SceneElement>) => void }) {
-  const assets = useEditor((s) => s.assets);
+  const assets = useEditor((s) => s.assets).filter((a) => a.media !== "audio");
   const known = assets.some((a) => a.ref === el.src);
   return (
     <Section title="Image">
@@ -352,8 +356,82 @@ function SceneInspector({ scene, isFirst }: { scene: Scene; isFirst: boolean }) 
         <NumberField label="Duration (ms)" value={scene.transition.durationMs} min={0} max={5000} step={100} onCommit={(v) => update({ transition: { ...scene.transition, durationMs: v } })} />
         {isFirst && <p className="col-span-2 text-[11px] text-mute">The first scene has no incoming transition.</p>}
       </Section>
+      <NarrationSection scene={scene} />
+      <MusicSection />
       <LayersList scene={scene} />
     </>
+  );
+}
+
+/** Pick one of the project's audio files; "" means none. */
+function AudioSelect({ value, onPick, placeholder }: { value: string | undefined; onPick: (a: AssetInfo | null) => void; placeholder: string }) {
+  const audio = useEditor((s) => s.assets).filter((a) => a.media === "audio" && a.durationMs);
+  const known = !value || audio.some((a) => a.ref === value);
+  return (
+    <Select value={value ?? ""} onChange={(e) => onPick(audio.find((a) => a.ref === e.target.value) ?? null)}>
+      <option value="">{placeholder}</option>
+      {!known && <option value={value}>Missing audio</option>}
+      {audio.map((a, i) => (
+        <option key={a.name} value={a.ref}>
+          Audio {i + 1} ({fmtTime(a.durationMs ?? 0)})
+        </option>
+      ))}
+    </Select>
+  );
+}
+
+function NarrationSection({ scene }: { scene: Scene }) {
+  const { setNarration, fitSceneToNarration } = useEditor.getState();
+  const n = scene.narration;
+  const overruns = n ? n.offsetMs + n.durationMs > scene.durationMs : false;
+  return (
+    <Section title="Narration">
+      <Field label="Voice-over" className="col-span-2">
+        <AudioSelect value={n?.src} placeholder="None"
+          onPick={(a) => setNarration(scene.id, a ? { src: a.ref, durationMs: a.durationMs!, volume: n?.volume ?? 1, offsetMs: n?.offsetMs ?? 0 } : undefined)} />
+      </Field>
+      {n && (
+        <>
+          <NumberField label="Volume (%)" value={Math.round(n.volume * 100)} min={0} max={100} step={5} onCommit={(v) => setNarration(scene.id, { ...n, volume: v / 100 })} />
+          <NumberField label="Start after (s)" value={n.offsetMs / 1000} min={0} max={120} step={0.1} onCommit={(v) => setNarration(scene.id, { ...n, offsetMs: Math.round(v * 1000) })} />
+          <p className={cx("col-span-2 text-[11px]", overruns ? "text-coral-ink" : "text-mute")}>
+            {fmtTime(n.durationMs)} of audio{overruns ? " — longer than the scene, so it will be cut off." : "."}
+          </p>
+          <Button variant="ghost" className="col-span-2 h-8 justify-center text-xs" onClick={() => fitSceneToNarration(scene.id)}>
+            Fit scene length to narration
+          </Button>
+        </>
+      )}
+      {!n && <p className="col-span-2 text-[11px] text-mute">Pick audio from the Assets tab, or generate a voice-over below.</p>}
+      <VoicePanel key={scene.id} scene={scene} />
+    </Section>
+  );
+}
+
+function MusicSection() {
+  const music = useEditor((s) => s.project?.music);
+  const setMusic = useEditor((s) => s.setMusic);
+  return (
+    <Section title="Music (whole video)">
+      <Field label="Track" className="col-span-2">
+        <AudioSelect value={music?.src} placeholder="No music"
+          onPick={(a) => setMusic(a ? { ...DEFAULT_MUSIC, ...music, src: a.ref, durationMs: a.durationMs! } : undefined)} />
+      </Field>
+      {music && (
+        <>
+          <NumberField label="Volume (%)" value={Math.round(music.volume * 100)} min={0} max={100} step={5} onCommit={(v) => setMusic({ ...music, volume: v / 100 })} />
+          <NumberField label="Under voice (%)" value={Math.round(music.duck * 100)} min={0} max={100} step={5} onCommit={(v) => setMusic({ ...music, duck: v / 100 })} />
+          <NumberField label="Fade in (s)" value={music.fadeInMs / 1000} min={0} max={30} step={0.5} onCommit={(v) => setMusic({ ...music, fadeInMs: Math.round(v * 1000) })} />
+          <NumberField label="Fade out (s)" value={music.fadeOutMs / 1000} min={0} max={30} step={0.5} onCommit={(v) => setMusic({ ...music, fadeOutMs: Math.round(v * 1000) })} />
+          <Field label="Repeat" className="col-span-2">
+            <Select value={music.loop ? "yes" : "no"} onChange={(e) => setMusic({ ...music, loop: e.target.value === "yes" })}>
+              <option value="yes">Loop until the video ends</option>
+              <option value="no">Play once</option>
+            </Select>
+          </Field>
+        </>
+      )}
+    </Section>
   );
 }
 

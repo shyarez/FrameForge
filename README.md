@@ -107,14 +107,18 @@ Key design decisions:
 | Data stories | Storyboard plan with reasons for skipped scenes; evidence-linked claims; count-up numbers; Evidence section in the inspector |
 | Evidence-aware updates | Dataset versioning (identical uploads detected); update review with before/after comparison; selective refresh; stale scenes; apply as one undo step; Evidence Inspector with canvas highlighting |
 | Evaluation | Evaluation panel; per-export performance log; update history; benchmark script |
+| Audio | MP3/WAV/OGG upload (checked by content and fully decoded; 25 MB); per-scene narration with volume and start offset; background music with loop, fades and ducking under speech; waveforms on the timeline; synced preview playback; mixed into the export as AAC and verified |
+| Voice (VoiceStudio) | Generate a scene's voice-over from a script with any VoiceStudio voice and speed; clone a voice from a sample; optional voice description; fit the scene to the voice; word-timed captions from transcription; voice-overs read from a data scene's text are flagged out of date when that text changes |
+| Narration writing (Ollama) | Optional "Write with AI" rewrites a scene's on-screen text as narration with a local model; output that introduces a number not on screen is rejected |
 | Interface | Original pixel-art ocean theme; light and dark modes; dashboard colours follow the time of day (dawn, day, sunset, night); WCAG AA contrast tested for every colour combination |
 
 **Not implemented:**
 
-- **AI narration** — no LLM is configured; story wording uses deterministic templates. Statistics would never depend on an LLM.
+- **LLM-written stories** — story wording on screen still uses deterministic templates. The optional Ollama writer only rephrases text a scene already shows, so statistics never depend on an LLM.
+- **Short-video generator** (topic → script → stock footage) — planned as the next phase.
 - **Selective video re-rendering** — every export renders all frames.
 - **User accounts** — out of scope for this prototype; all projects are local to the machine.
-- Cloud deployment, audio, keyframe curves and real-time collaboration (out of scope).
+- Cloud deployment, keyframe curves and real-time collaboration (out of scope).
 
 ## Technology
 
@@ -148,6 +152,11 @@ Optional environment variables:
 | `FF_CHROME_PATH` | Path to a Chrome/Chromium executable if it is not in a standard location |
 | `FF_FFMPEG_PATH` | Use a system FFmpeg instead of the bundled one |
 | `FF_DATA_DIR` | Where projects, assets, datasets and exports are stored (default `./data`) |
+| `FF_VOICE_URL` | Voice engine (VoiceStudio's local API, or any server with the same OpenAI-style routes); default `http://127.0.0.1:3900` |
+| `FF_VOICE_API_KEY` | Only if the voice engine requires one (VoiceStudio needs none on localhost) |
+| `FF_OLLAMA_URL` / `FF_OLLAMA_MODEL` | Local narration writer; defaults `http://127.0.0.1:11434` and `llama3.2` |
+
+**Voice setup:** run VoiceStudio and install a speech model and a recognition model in Catalogue → Models; `curl http://localhost:3900/health` should answer `{"status":"ok",…}`. Without VoiceStudio or Ollama, `npx tsx scripts/mock-voice.ts` starts stand-ins on ports 3990 and 11499 (set `FF_VOICE_URL`/`FF_OLLAMA_URL` to match). The e2e tests `audio` and `voice` cover these features.
 
 ### Scripts
 

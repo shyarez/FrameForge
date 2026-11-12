@@ -1,13 +1,15 @@
 import "server-only";
 import { promises as fs } from "node:fs";
 import { nanoid } from "nanoid";
+import { audioPlan, hasAudio } from "@/lib/engine/audio";
 import type { Project } from "@/lib/schema/project";
+import { assetPath } from "./assets";
 import { probeVideo, renderProjectToMp4, type ProbeResult } from "./render";
 import { inlineAssets } from "./inlineAssets";
 import { appendExportMetric } from "./metrics";
 import { exportFile } from "./storage";
 
-export type ExportStatus = "queued" | "launching" | "rendering" | "encoding" | "verifying" | "done" | "error";
+export type ExportStatus = "queued" | "launching" | "rendering" | "encoding" | "mixing" | "verifying" | "done" | "error";
 
 export interface ExportJob {
   id: string;
@@ -49,10 +51,17 @@ export function startExport(owner: string, project: Project, origin: string): Ex
       const out = exportFile(owner, job.id);
       // Images are embedded so the render browser never needs the user's session.
       const renderable = await inlineAssets(owner, project);
+      // Audio is read straight from the owner's asset folder by FFmpeg; the browser never sees it.
+      const plan = audioPlan(project);
+      const files: Record<string, string> = {};
+      for (const src of [...plan.narration.map((c) => c.src), ...(plan.music ? [plan.music.src] : [])]) {
+        files[src] = assetPath(owner, project.id, src.slice("asset:".length));
+      }
       await renderProjectToMp4({
         project: renderable,
         origin,
         outFile: out,
+        audio: { plan, files },
         onProgress: (p) => {
           job.status = p.phase;
           job.frame = p.frame;
@@ -63,6 +72,7 @@ export function startExport(owner: string, project: Project, origin: string): Ex
       job.status = "verifying";
       job.probe = await probeVideo(out);
       if (!job.probe.decodedOk) throw new Error("Output failed decode verification");
+      if (hasAudio(plan) && !job.probe.audio) throw new Error("Output is missing its audio track");
       job.status = "done";
       // Record measured performance for the evaluation panel; a metrics failure never fails the export.
       const renderSec = (renderedAt - job.startedAt) / 1000;

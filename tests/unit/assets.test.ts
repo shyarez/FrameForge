@@ -49,7 +49,10 @@ describe("asset storage", () => {
 
   it("rejects non-images and oversize files", async () => {
     await expect(saveAsset(OWNER, "prj_testAssets1", new TextEncoder().encode("<svg/>"))).rejects.toMatchObject({ status: 415 });
-    await expect(saveAsset(OWNER, "prj_testAssets1", new Uint8Array(8 * 1024 * 1024 + 1))).rejects.toMatchObject({ status: 413 });
+    const big = new Uint8Array(8 * 1024 * 1024 + 1);
+    big.set(PNG_1PX);
+    await expect(saveAsset(OWNER, "prj_testAssets1", big)).rejects.toMatchObject({ status: 413 });
+    await expect(saveAsset(OWNER, "prj_testAssets1", new Uint8Array(1024))).rejects.toMatchObject({ status: 415 });
   });
 
   it("refuses path traversal in names and ids", async () => {

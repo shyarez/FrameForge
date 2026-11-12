@@ -2,20 +2,40 @@ import "server-only";
 import { spawn } from "node:child_process";
 import { existsSync, promises as fs } from "node:fs";
 import path from "node:path";
-import ffmpegStatic from "ffmpeg-static";
 import { chromium, type Browser } from "playwright-core";
+import { buildAudioFilter, hasAudio, type AudioPlan } from "@/lib/engine/audio";
 import { frameTimes } from "@/lib/engine/evaluate";
 import { outputSize, projectDurationMs, type Project } from "@/lib/schema/project";
+import { ffmpegPath, runFfmpeg } from "./media";
+
+export { ffmpegPath };
 
 /**
  * MP4 exporter. Follows the HyperFrames capture pattern (seekable page → per-frame
  * screenshot → FFmpeg) with our own seek contract: window.__ffInit / window.__ffSeek.
+ * Audio, when the project has any, is mixed in a second FFmpeg pass that copies the video stream.
  */
 
-export function ffmpegPath(): string {
-  const p = process.env.FF_FFMPEG_PATH || (ffmpegStatic as unknown as string | null);
-  if (!p || !existsSync(p)) throw new Error("FFmpeg binary not found. Set FF_FFMPEG_PATH or reinstall ffmpeg-static.");
-  return p;
+export interface AudioInput {
+  plan: AudioPlan;
+  /** Absolute file path for each audio asset reference used by the plan. */
+  files: Record<string, string>;
+}
+
+/** Mix the plan's audio onto an encoded video, copying the video stream unchanged. */
+export async function muxAudio(videoFile: string, audio: AudioInput, outFile: string, signal?: AbortSignal): Promise<void> {
+  const { filter, inputs } = buildAudioFilter(audio.plan);
+  const args = ["-y", "-hide_banner", "-loglevel", "error", "-i", videoFile];
+  args.push("-f", "lavfi", "-t", (audio.plan.totalMs / 1000).toFixed(3), "-i", "anullsrc=r=48000:cl=stereo");
+  for (const input of inputs) {
+    const file = audio.files[input.src];
+    if (!file || !existsSync(file)) throw new Error(`Audio file is missing: ${input.src.replace(/^asset:/, "")}`);
+    if (input.loop) args.push("-stream_loop", "-1");
+    args.push("-i", file);
+  }
+  args.push("-filter_complex", filter, "-map", "0:v:0", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", outFile);
+  const { code, err } = await runFfmpeg(args, { signal, timeoutMs: 30 * 60_000 });
+  if (code !== 0) throw new Error(`Audio mixing failed (exit ${code}): ${err.trim().slice(-800) || "no output"}`);
 }
 
 const CHROME_CANDIDATES = [
@@ -35,7 +55,7 @@ export function chromePath(): string | undefined {
 }
 
 export interface RenderProgress {
-  phase: "launching" | "rendering" | "encoding";
+  phase: "launching" | "rendering" | "encoding" | "mixing";
   frame: number;
   totalFrames: number;
 }
@@ -47,9 +67,11 @@ export interface RenderOptions {
   outFile: string;
   onProgress?: (p: RenderProgress) => void;
   signal?: AbortSignal;
+  /** Narration and music to mix in; omitted or empty means a silent video. */
+  audio?: AudioInput;
 }
 
-export async function renderProjectToMp4({ project, origin, outFile, onProgress, signal }: RenderOptions) {
+export async function renderProjectToMp4({ project, origin, outFile, onProgress, signal, audio }: RenderOptions) {
   const { fps, resolution } = project.exportSettings;
   const { width, height } = outputSize(project.aspectRatio, resolution);
   const times = frameTimes(projectDurationMs(project), fps);
@@ -59,6 +81,8 @@ export async function renderProjectToMp4({ project, origin, outFile, onProgress,
   onProgress?.({ phase: "launching", frame: 0, totalFrames });
   let browser: Browser | undefined;
   const tmpOut = `${outFile}.partial.mp4`;
+  const mixedOut = `${outFile}.mixed.mp4`;
+  const withAudio = audio && hasAudio(audio.plan) ? audio : null;
   const ff = spawn(
     ffmpegPath(),
     [
@@ -110,11 +134,20 @@ export async function renderProjectToMp4({ project, origin, outFile, onProgress,
     ff.stdin.end();
     const code = await ffExit;
     if (code !== 0) throw new Error(`FFmpeg failed (exit ${code}): ${ffErr.trim() || "no output"}`);
-    await fs.rename(tmpOut, outFile);
+    await browser.close().catch(() => undefined);
+    if (withAudio) {
+      onProgress?.({ phase: "mixing", frame: totalFrames, totalFrames });
+      await muxAudio(tmpOut, withAudio, mixedOut, signal);
+      await fs.rm(tmpOut, { force: true });
+      await fs.rename(mixedOut, outFile);
+    } else {
+      await fs.rename(tmpOut, outFile);
+    }
   } catch (err) {
     ff.stdin.destroy();
     ff.kill("SIGKILL");
     await fs.rm(tmpOut, { force: true });
+    await fs.rm(mixedOut, { force: true });
     throw err;
   } finally {
     await browser?.close().catch(() => undefined);
@@ -130,23 +163,19 @@ export interface ProbeResult {
   durationSec: number;
   codec: string;
   decodedOk: boolean;
+  /** The audio track, if the file has one. */
+  audio: { codec: string; sampleRate: number; channels: string } | null;
 }
 
-/** Verify an MP4 by decoding every frame with FFmpeg (ffmpeg-static ships no ffprobe). */
+/** Verify an MP4 by decoding every frame (and audio sample) with FFmpeg (ffmpeg-static ships no ffprobe). */
 export async function probeVideo(file: string): Promise<ProbeResult> {
-  const run = (args: string[]) =>
-    new Promise<{ code: number; err: string }>((resolve, reject) => {
-      const p = spawn(ffmpegPath(), args, { stdio: ["ignore", "ignore", "pipe"] });
-      let err = "";
-      p.stderr.on("data", (d) => (err += d.toString()));
-      p.on("error", reject);
-      p.on("close", (code) => resolve({ code: code ?? -1, err }));
-    });
-  const info = await run(["-hide_banner", "-i", file, "-map", "0:v:0", "-f", "null", "-"]);
-  const stream = /Stream #0:0.*Video: (\w+).*?, (\d{2,5})x(\d{2,5}).*?, ([\d.]+) fps/.exec(info.err);
+  const info = await runFfmpeg(["-hide_banner", "-i", file, "-map", "0:v:0", "-f", "null", "-"]);
+  const stream = /Stream #0:\d+.*Video: (\w+).*?, (\d{2,5})x(\d{2,5}).*?, ([\d.]+) fps/.exec(info.err);
+  const audio = /Stream #0:\d+.*Audio: (\w+).*?, (\d+) Hz, ([\w.]+)/.exec(info.err);
   const dur = /Duration: (\d+):(\d+):([\d.]+)/.exec(info.err);
-  const strict = await run(["-v", "error", "-i", file, "-f", "null", "-"]);
+  const strict = await runFfmpeg(["-v", "error", "-i", file, "-f", "null", "-"]);
   return {
+    audio: audio ? { codec: audio[1], sampleRate: Number(audio[2]), channels: audio[3] } : null,
     codec: stream?.[1] ?? "unknown",
     width: Number(stream?.[2] ?? 0),
     height: Number(stream?.[3] ?? 0),

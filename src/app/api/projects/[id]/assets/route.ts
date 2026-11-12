@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listAssets, MAX_ASSET_BYTES, saveAsset } from "@/lib/server/assets";
+import { listAssets, MAX_UPLOAD_BYTES, saveAsset } from "@/lib/server/assets";
 import { requireUser } from "@/lib/server/auth";
 import { errorResponse } from "@/lib/server/http";
 import { assertId, loadProject, StorageError } from "@/lib/server/storage";
@@ -24,11 +24,12 @@ export async function POST(req: Request, { params }: Ctx) {
     const { id } = await params;
     await loadProject(user.id, assertId(id));
     const declared = Number(req.headers.get("content-length") ?? 0);
-    if (declared > MAX_ASSET_BYTES + 64 * 1024) throw new StorageError("Image is larger than 8 MB", 413);
+    if (declared > MAX_UPLOAD_BYTES + 64 * 1024) throw new StorageError("File is larger than 25 MB", 413);
     const form = await req.formData().catch(() => null);
     const file = form?.get("file");
     if (!file || typeof file === "string") throw new StorageError('Expected a "file" field', 400);
-    if (file.size > MAX_ASSET_BYTES) throw new StorageError("Image is larger than 8 MB", 413);
+    // Per-type limits (8 MB images, 25 MB audio) are enforced by saveAsset from the file's content.
+    if (file.size > MAX_UPLOAD_BYTES) throw new StorageError("File is larger than 25 MB", 413);
     const asset = await saveAsset(user.id, id, new Uint8Array(await file.arrayBuffer()));
     return NextResponse.json({ asset }, { status: 201 });
   } catch (err) {
