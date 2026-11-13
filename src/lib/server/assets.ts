@@ -1,23 +1,26 @@
 import "server-only";
 import { promises as fs } from "node:fs";
 import { nanoid } from "nanoid";
-import { probeAudio } from "./media";
+import { probeAudio, probeVideoFile } from "./media";
 import { assertId, userPath, StorageError } from "./storage";
 
 /**
- * Project assets: images and audio. Files are identified by their content (magic bytes), never by the
- * client-supplied name or MIME type, and stored under server-generated names. Audio must also decode
- * completely with FFmpeg. SVG is deliberately not accepted: it can carry script.
+ * Project assets: images, audio and video. Files are identified by their content (magic bytes), never by
+ * the client-supplied name or MIME type, and stored under server-generated names. Audio and video must
+ * also decode with FFmpeg. SVG is deliberately not accepted: it can carry script.
  */
 
 export const MAX_ASSET_BYTES = 8 * 1024 * 1024;
 export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 /** Largest upload of any kind (used to reject oversized requests before reading them). */
-export const MAX_UPLOAD_BYTES = MAX_AUDIO_BYTES;
+export const MAX_UPLOAD_BYTES = MAX_VIDEO_BYTES;
 
 export type ImageKind = "png" | "jpg" | "gif" | "webp";
 export type AudioKind = "mp3" | "wav" | "ogg";
-export type AssetKind = ImageKind | AudioKind;
+export type VideoKind = "mp4" | "webm";
+export type AssetKind = ImageKind | AudioKind | VideoKind;
+export type MediaType = "image" | "audio" | "video";
 
 export const MIME: Record<AssetKind, string> = {
   png: "image/png",
@@ -27,12 +30,16 @@ export const MIME: Record<AssetKind, string> = {
   mp3: "audio/mpeg",
   wav: "audio/wav",
   ogg: "audio/ogg",
+  mp4: "video/mp4",
+  webm: "video/webm",
 };
 
 const AUDIO_KINDS: readonly string[] = ["mp3", "wav", "ogg"];
 export const isAudioKind = (k: string): k is AudioKind => AUDIO_KINDS.includes(k);
+export const isVideoKind = (k: string): k is VideoKind => k === "mp4" || k === "webm";
+export const mediaOf = (k: AssetKind): MediaType => (isAudioKind(k) ? "audio" : isVideoKind(k) ? "video" : "image");
 
-const FILE_RE = /^[A-Za-z0-9_-]{6,40}\.(png|jpg|gif|webp|mp3|wav|ogg)$/;
+const FILE_RE = /^[A-Za-z0-9_-]{6,40}\.(png|jpg|gif|webp|mp3|wav|ogg|mp4|webm)$/;
 
 export function sniffImage(buf: Uint8Array): ImageKind | null {
   const at = (i: number, ...bytes: number[]) => bytes.every((b, j) => buf[i + j] === b);
@@ -53,8 +60,19 @@ export function sniffAudio(buf: Uint8Array): AudioKind | null {
   return null;
 }
 
+export function sniffVideo(buf: Uint8Array): VideoKind | null {
+  const at = (i: number, ...bytes: number[]) => bytes.every((b, j) => buf[i + j] === b);
+  if (buf.length >= 4 && at(0, 0x1a, 0x45, 0xdf, 0xa3)) return "webm"; // EBML (WebM/Matroska)
+  if (buf.length >= 12 && at(4, 0x66, 0x74, 0x79, 0x70)) {
+    // ISO base media "ftyp"; audio-only brands (M4A/M4B/M4P) are not videos.
+    const brand = String.fromCharCode(...buf.subarray(8, 12));
+    return /^M4[ABP]/.test(brand) ? null : "mp4";
+  }
+  return null;
+}
+
 export function sniffAsset(buf: Uint8Array): AssetKind | null {
-  return sniffImage(buf) ?? sniffAudio(buf);
+  return sniffImage(buf) ?? sniffAudio(buf) ?? sniffVideo(buf);
 }
 
 export function assertAssetName(name: string): string {
@@ -65,7 +83,7 @@ export function assertAssetName(name: string): string {
 const assetDir = (owner: string, projectId: string) => userPath(owner, "assets", assertId(projectId));
 /** Absolute path of a stored asset (validated name, inside the owner's folder). */
 export const assetPath = (owner: string, projectId: string, name: string) => userPath(owner, "assets", assertId(projectId), assertAssetName(name));
-/** Measured audio facts, stored next to the file so listing never needs to decode it again. */
+/** Measured media facts, stored next to the file so listing never needs to decode it again. */
 const metaPath = (owner: string, projectId: string, name: string) => `${assetPath(owner, projectId, name)}.meta.json`;
 
 export interface AssetInfo {
@@ -74,40 +92,48 @@ export interface AssetInfo {
   ref: string;
   bytes: number;
   kind: AssetKind;
-  media: "image" | "audio";
-  /** Audio only: decoded length. */
+  media: MediaType;
+  /** Audio and video: length. */
   durationMs?: number;
+  /** Video only: picture size. */
+  width?: number;
+  height?: number;
 }
+
+const probeMedia = (file: string, media: MediaType) => (media === "audio" ? probeAudio(file) : probeVideoFile(file)).catch(() => null);
 
 export async function saveAsset(owner: string, projectId: string, data: Uint8Array): Promise<AssetInfo> {
   if (data.byteLength === 0) throw new StorageError("Empty file", 400);
   const kind = sniffAsset(data);
-  if (!kind) throw new StorageError("Unsupported file: upload a PNG, JPEG, GIF or WebP image, or an MP3, WAV or OGG audio file", 415);
-  const audio = isAudioKind(kind);
-  if (!audio && data.byteLength > MAX_ASSET_BYTES) throw new StorageError("Image is larger than 8 MB", 413);
-  if (audio && data.byteLength > MAX_AUDIO_BYTES) throw new StorageError("Audio is larger than 25 MB", 413);
+  if (!kind) throw new StorageError("Unsupported file: upload a PNG, JPEG, GIF or WebP image, an MP3, WAV or OGG audio file, or an MP4 or WebM video", 415);
+  const media = mediaOf(kind);
+  if (media === "image" && data.byteLength > MAX_ASSET_BYTES) throw new StorageError("Image is larger than 8 MB", 413);
+  if (media === "audio" && data.byteLength > MAX_AUDIO_BYTES) throw new StorageError("Audio is larger than 25 MB", 413);
+  if (media === "video" && data.byteLength > MAX_VIDEO_BYTES) throw new StorageError("Video is larger than 100 MB", 413);
 
-  const name = `${audio ? "aud" : "img"}_${nanoid(12)}.${kind}`;
+  const prefix = { image: "img", audio: "aud", video: "vid" }[media];
+  const name = `${prefix}_${nanoid(12)}.${kind}`;
   await fs.mkdir(assetDir(owner, projectId), { recursive: true });
   const file = assetPath(owner, projectId, name);
   await fs.writeFile(file, data);
-  if (!audio) return { name, ref: `asset:${name}`, bytes: data.byteLength, kind, media: "image" };
+  if (media === "image") return { name, ref: `asset:${name}`, bytes: data.byteLength, kind, media };
 
-  const probe = await probeAudio(file).catch(() => null);
+  const probe = await probeMedia(file, media);
   if (!probe) {
     await fs.rm(file, { force: true });
-    throw new StorageError("This audio file could not be decoded", 415);
+    throw new StorageError(`This ${media} file could not be decoded`, 415);
   }
   await fs.writeFile(metaPath(owner, projectId, name), JSON.stringify(probe));
-  return { name, ref: `asset:${name}`, bytes: data.byteLength, kind, media: "audio", durationMs: probe.durationMs };
+  return { name, ref: `asset:${name}`, bytes: data.byteLength, kind, media, ...probe };
 }
 
-async function audioDuration(owner: string, projectId: string, name: string): Promise<number | undefined> {
+/** Measured facts for audio/video, from the stored sidecar (re-probed if it is missing). */
+async function mediaMeta(owner: string, projectId: string, name: string, media: MediaType): Promise<{ durationMs?: number; width?: number; height?: number }> {
   const meta = await fs.readFile(metaPath(owner, projectId, name), "utf8").then(JSON.parse, () => null);
-  if (meta && typeof meta.durationMs === "number") return meta.durationMs;
-  const probe = await probeAudio(assetPath(owner, projectId, name)).catch(() => null);
+  if (meta && typeof meta.durationMs === "number") return meta;
+  const probe = await probeMedia(assetPath(owner, projectId, name), media);
   if (probe) await fs.writeFile(metaPath(owner, projectId, name), JSON.stringify(probe)).catch(() => undefined);
-  return probe?.durationMs;
+  return probe ?? {};
 }
 
 export async function listAssets(owner: string, projectId: string): Promise<AssetInfo[]> {
@@ -121,8 +147,13 @@ export async function listAssets(owner: string, projectId: string): Promise<Asse
   for (const name of names.filter((n) => FILE_RE.test(n))) {
     const stat = await fs.stat(assetPath(owner, projectId, name));
     const kind = name.split(".").pop() as AssetKind;
-    const info: AssetInfo = { name, ref: `asset:${name}`, bytes: stat.size, kind, media: isAudioKind(kind) ? "audio" : "image" };
-    if (info.media === "audio") info.durationMs = await audioDuration(owner, projectId, name);
+    const info: AssetInfo = { name, ref: `asset:${name}`, bytes: stat.size, kind, media: mediaOf(kind) };
+    if (info.media !== "image") {
+      const m = await mediaMeta(owner, projectId, name, info.media);
+      if (m.durationMs) info.durationMs = m.durationMs;
+      if (m.width) info.width = m.width;
+      if (m.height) info.height = m.height;
+    }
     out.push(info);
   }
   return out;

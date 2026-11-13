@@ -154,7 +154,9 @@ export function VoicePanel({ scene }: { scene: Scene }) {
   const spoken = sceneSpokenText(scene);
 
   const addCaptions = async (sceneId: string, assetRef: string) => {
-    const { cues } = await api.transcribe(project.id, assetRef);
+    // The generated voice-over's script (if any) gives captions their exact wording.
+    const scriptText = findScene(useEditor.getState().project!, sceneId)?.narration?.script?.text;
+    const { cues } = await api.transcribe(project.id, assetRef, scriptText);
     const sc = findScene(useEditor.getState().project!, sceneId);
     if (!sc) return;
     useEditor.getState().setCaptions(sceneId, captionElements(cues, sc, useEditor.getState().project!.aspectRatio));

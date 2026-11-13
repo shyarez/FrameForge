@@ -6,6 +6,7 @@ import type { Project } from "@/lib/schema/project";
 import { assetPath } from "./assets";
 import { probeVideo, renderProjectToMp4, type ProbeResult } from "./render";
 import { inlineAssets } from "./inlineAssets";
+import { grantRenderMedia, revokeRenderMedia } from "./renderMedia";
 import { appendExportMetric } from "./metrics";
 import { exportFile } from "./storage";
 
@@ -47,10 +48,12 @@ export function startExport(owner: string, project: Project, origin: string): Ex
 
   const run = async () => {
     job.startedAt = Date.now();
+    // Lets the render browser stream this project's videos for the duration of the export only.
+    const mediaToken = grantRenderMedia(owner, project.id);
     try {
       const out = exportFile(owner, job.id);
-      // Images are embedded so the render browser never needs the user's session.
-      const renderable = await inlineAssets(owner, project);
+      // Images are embedded and videos get short-lived URLs, so the render browser never needs the user's session.
+      const renderable = await inlineAssets(owner, project, mediaToken);
       // Audio is read straight from the owner's asset folder by FFmpeg; the browser never sees it.
       const plan = audioPlan(project);
       const files: Record<string, string> = {};
@@ -94,6 +97,7 @@ export function startExport(owner: string, project: Project, origin: string): Ex
       job.status = "error";
       job.error = err instanceof Error ? err.message : String(err);
     } finally {
+      revokeRenderMedia(mediaToken);
       job.finishedAt = Date.now();
     }
   };

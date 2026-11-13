@@ -11,6 +11,7 @@ import type { ExportMetric } from "@/lib/server/metrics";
 import type { PublicUser } from "@/lib/server/users";
 import type { Voice, VoiceStatus } from "@/lib/server/voice";
 import type { WriterStatus } from "@/lib/server/writer";
+import type { ShortJob } from "@/lib/server/shorts";
 import type { CaptionCue, Transcript } from "@/lib/engine/narration";
 
 /** Only same-site relative paths are allowed as a post-login destination (no open redirects). */
@@ -111,9 +112,18 @@ export const api = {
   },
   speak: (projectId: string, body: { text: string; voice: string; speed: number; language?: string; description?: string }) =>
     postJson(`/api/projects/${encodeURIComponent(projectId)}/voice/speak`, body).then((r) => json<{ asset: AssetInfo }>(r)),
-  transcribe: (projectId: string, asset: string, language?: string) =>
-    postJson(`/api/projects/${encodeURIComponent(projectId)}/voice/transcribe`, { asset, language }).then((r) => json<{ transcript: Transcript; cues: CaptionCue[] }>(r)),
+  transcribe: (projectId: string, asset: string, script?: string, language?: string) =>
+    postJson(`/api/projects/${encodeURIComponent(projectId)}/voice/transcribe`, { asset, script, language }).then((r) => json<{ transcript: Transcript; cues: CaptionCue[] }>(r)),
   writeNarration: (projectId: string, text: string, style?: string) =>
     postJson(`/api/projects/${encodeURIComponent(projectId)}/voice/write`, { text, style }).then((r) => json<{ text: string }>(r)),
+  shortsStatus: () =>
+    fetch("/api/shorts/status", { cache: "no-store" }).then((r) => json<{ voice: VoiceStatus; voices: Voice[]; writer: WriterStatus; pexels: { configured: boolean } }>(r)),
+  startShort: (options: Record<string, unknown>, music?: File | null) => {
+    const form = new FormData();
+    form.append("options", JSON.stringify(options));
+    if (music) form.append("music", music);
+    return fetch("/api/shorts", { method: "POST", body: form }).then((r) => json<{ job: ShortJob }>(r));
+  },
+  getShort: (jobId: string) => fetch(`/api/shorts/${encodeURIComponent(jobId)}`, { cache: "no-store" }).then((r) => json<{ job: ShortJob }>(r)),
   exportFileUrl: (jobId: string, download = false) => `/api/exports/${encodeURIComponent(jobId)}/file${download ? "?download=1" : ""}`,
 };

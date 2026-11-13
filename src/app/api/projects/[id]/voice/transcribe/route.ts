@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { captionCues } from "@/lib/engine/narration";
+import { alignToScript, captionCues } from "@/lib/engine/narration";
 import { assertAssetName, isAudioKind, readAsset } from "@/lib/server/assets";
 import { requireUser } from "@/lib/server/auth";
 import { errorResponse } from "@/lib/server/http";
@@ -10,7 +10,7 @@ import { transcribe } from "@/lib/server/voice";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-const Body = z.object({ asset: z.string().max(100), language: z.string().max(40).optional() });
+const Body = z.object({ asset: z.string().max(100), language: z.string().max(40).optional(), script: z.string().max(4096).optional() });
 
 /** Transcribe one of the project's audio assets with timings and return caption cues. */
 export async function POST(req: Request, { params }: Ctx) {
@@ -26,7 +26,9 @@ export async function POST(req: Request, { params }: Ctx) {
     // readAsset resolves inside this user's folder only, so another user's audio is a 404.
     const { data } = await readAsset(user.id, assertId(id), name);
     const transcript = await transcribe(new Uint8Array(data), name, parsed.data.language);
-    return NextResponse.json({ transcript, cues: captionCues(transcript) });
+    // With the script known, captions use its exact wording and the engine's timings.
+    const aligned = parsed.data.script ? alignToScript(transcript, parsed.data.script) : transcript;
+    return NextResponse.json({ transcript, cues: captionCues(aligned) });
   } catch (err) {
     return errorResponse(err);
   }

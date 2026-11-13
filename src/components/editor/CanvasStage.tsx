@@ -205,7 +205,7 @@ export function CanvasStage() {
           onPointerCancel={onUp}
           onDoubleClick={onDoubleClick}
         >
-          <SceneView state={state} width={logical.width} height={logical.height} projectId={project.id} hideElementId={editing?.id} />
+          <SceneView state={state} width={logical.width} height={logical.height} projectId={project.id} hideElementId={editing?.id} playing={playing} />
           {guides.map((g, i) => (
             <div key={i} aria-hidden className="pointer-events-none absolute bg-coral"
               style={g.axis === "x" ? { left: g.pos - 1 / scale, top: 0, width: 2 / scale, height: logical.height } : { top: g.pos - 1 / scale, left: 0, height: 2 / scale, width: logical.width }} />

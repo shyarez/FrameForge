@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { ChevronDown, Clock, Layers, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Clock, Layers, Plus, Sparkles, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -19,6 +19,7 @@ import { ArcadeLabel, Button, Field, IconButton, Select, TextInput, cx } from "@
 import { ThemeToggle, useTheme } from "@/components/theme/theme";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { PhaseButton, useOceanPhase } from "./OceanClock";
+import { ShortGenerator } from "./ShortGenerator";
 import { SURFACES, surfaceVars, surfacesAt } from "./phaseSurfaces";
 
 /** Scene thumbnail that plays its animation in a loop while hovered. */
@@ -220,6 +221,7 @@ export function Dashboard() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState<TemplateId | null>(null);
+  const [generating, setGenerating] = useState(false);
   const ocean = useOceanPhase();
   const theme = useTheme();
   // Page colours follow the same phase as the water (dashboard only; the editor keeps fixed colours).
@@ -254,6 +256,9 @@ export function Dashboard() {
           </div>
           <div className="ml-auto"><UserMenu /></div>
           <ThemeToggle />
+          <Button variant="ghost" onClick={() => setGenerating(true)}>
+            <Sparkles className="size-4" /> Generate short
+          </Button>
           <Button variant="primary" onClick={() => setCreating("launch")}>
             <Plus className="size-4" /> New project
           </Button>
@@ -286,6 +291,9 @@ export function Dashboard() {
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }} className="mt-8 flex gap-4">
             <Button variant="primary" className="h-12 px-6 text-lg" onClick={() => setCreating("launch")}>Get started</Button>
+            <Button className="h-12 bg-aqua px-5 text-lg text-onaccent" onClick={() => setGenerating(true)}>
+              <Sparkles className="size-4" /> Generate a short
+            </Button>
             <a href="#quest" className="px-btn inline-flex h-12 items-center gap-2 bg-raised px-5 font-display text-lg font-semibold [--px-c:var(--color-edge)]">
               How it works <ChevronDown className="size-4" />
             </a>
@@ -383,6 +391,26 @@ export function Dashboard() {
                 </div>
               </div>
               <NewProjectForm initialTemplate={creating} onCreated={(id) => router.push(`/editor/${id}`)} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {generating && (
+          <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div role="dialog" aria-modal="true" aria-label="Generate a short video" className="px-box scroll-thin max-h-[92vh] w-full max-w-lg overflow-y-auto bg-panel p-7"
+              initial={{ y: 30, scale: 0.9 }} animate={{ y: 0, scale: 1 }} exit={{ y: 30, scale: 0.9 }} transition={{ type: "spring", stiffness: 400, damping: 24 }}
+              onKeyDown={(e) => e.key === "Escape" && setGenerating(false)}>
+              <div className="mb-6 flex items-center gap-3">
+                <Sprite name="reel" scale={3} />
+                <div className="flex-1">
+                  <ArcadeLabel className="text-aqua-ink">Auto mode</ArcadeLabel>
+                  <h2 className="mt-1.5 font-display text-3xl font-bold">Generate a short</h2>
+                </div>
+                <IconButton label="Close" onClick={() => setGenerating(false)}>✕</IconButton>
+              </div>
+              <ShortGenerator onDone={(id) => router.push(`/editor/${id}`)} />
             </motion.div>
           </motion.div>
         )}

@@ -111,7 +111,30 @@ export const ImageElementSchema = ElementBase.extend({
   radius: z.number().min(0),
 });
 
-export const ChartDatumSchema = z.object({ label: z.string().max(200), value: z.number() });
+/**
+ * Video source: a project asset ("asset:<name>.mp4|webm"), or — only inside an export — a short-lived
+ * render URL that the exporter issues so the headless browser can stream the file without a session.
+ */
+export const VideoSrcSchema = z
+  .string()
+  .regex(/^(asset:|\/api\/render-media\/[A-Za-z0-9_-]{20,64}\/)[A-Za-z0-9_-]{6,40}\.(mp4|webm)$/, "Expected a video asset reference");
+
+export const VideoElementSchema = ElementBase.extend({
+  type: z.literal("video"),
+  src: VideoSrcSchema,
+  fit: z.enum(["cover", "contain"]),
+  radius: z.number().min(0),
+  /** Measured length of the file. */
+  durationMs: z.number().min(1).max(3_600_000),
+  /** Where in the file playback starts when the scene starts. */
+  trimStartMs: z.number().min(0).max(3_600_000),
+  /** Repeat from trimStart when the file ends; otherwise hold the last frame. */
+  loop: z.boolean(),
+  /** Attribution for stock footage (shown in the inspector; required by Pexels' terms). */
+  credit: z.object({ provider: z.string().max(40), author: z.string().max(200), url: z.string().url().max(500) }).optional(),
+});
+
+export const ChartDatumSchema =z.object({ label: z.string().max(200), value: z.number() });
 
 export const ChartElementSchema = ElementBase.extend({
   type: z.literal("chart"),
@@ -129,12 +152,14 @@ export const ElementSchema = z.discriminatedUnion("type", [
   ShapeElementSchema,
   ImageElementSchema,
   ChartElementSchema,
+  VideoElementSchema,
 ]);
 export type SceneElement = z.infer<typeof ElementSchema>;
 export type TextElement = z.infer<typeof TextElementSchema>;
 export type ShapeElement = z.infer<typeof ShapeElementSchema>;
 export type ImageElement = z.infer<typeof ImageElementSchema>;
 export type ChartElement = z.infer<typeof ChartElementSchema>;
+export type VideoElement = z.infer<typeof VideoElementSchema>;
 export type ElementType = SceneElement["type"];
 
 export const TransitionSchema = z.object({

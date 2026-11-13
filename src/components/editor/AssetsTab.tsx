@@ -3,6 +3,7 @@
 import { ImagePlus, Loader2, Mic, Music2, Pause, Play, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import { api } from "@/lib/client/api";
+import { createVideo } from "@/lib/schema/factory";
 import { CANVAS_SIZES } from "@/lib/schema/project";
 import type { AssetInfo } from "@/lib/server/assets";
 import { fmtTime } from "./Timeline";
@@ -11,7 +12,7 @@ import { Sprite } from "@/components/pixel/Sprite";
 import { ArcadeLabel, IconButton, cx } from "@/components/ui/primitives";
 import { useEditor } from "@/store/editor";
 
-const ACCEPT = "image/png,image/jpeg,image/gif,image/webp,audio/mpeg,audio/wav,audio/x-wav,audio/ogg,.mp3,.wav,.ogg";
+const ACCEPT = "image/png,image/jpeg,image/gif,image/webp,audio/mpeg,audio/wav,audio/x-wav,audio/ogg,.mp3,.wav,.ogg,video/mp4,video/webm,.mp4,.webm";
 
 /** Default music settings when a track is first chosen. */
 export const DEFAULT_MUSIC = { volume: 0.35, loop: true, fadeInMs: 1000, fadeOutMs: 1500, duck: 0.3 };
@@ -87,9 +88,10 @@ function naturalSize(src: string): Promise<{ w: number; h: number }> {
 export function AssetsTab() {
   const project = useEditor((s) => s.project)!;
   const allAssets = useEditor((s) => s.assets);
-  const assets = allAssets.filter((a) => a.media !== "audio");
+  const assets = allAssets.filter((a) => a.media === "image");
   const audio = allAssets.filter((a) => a.media === "audio");
-  const { setAssets, addElement } = useEditor.getState();
+  const videos = allAssets.filter((a) => a.media === "video");
+  const { setAssets, addElement, insertElement } = useEditor.getState();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -143,6 +145,23 @@ export function AssetsTab() {
     await removeFile(name);
   };
 
+  /** A clip becomes a full-canvas background at the back of the scene. */
+  const placeVideo = (a: AssetInfo) => {
+    if (!a.durationMs) return;
+    insertElement(createVideo(a.ref, a.durationMs, project.aspectRatio, { name: "Video" }), "back");
+  };
+
+  const removeVideo = async (name: string, ref: string) => {
+    const used = project.scenes.some((s) => s.elements.some((e) => e.type === "video" && e.src === ref));
+    if (!confirm(used ? "This video is used in your scenes. Delete it and remove it from those scenes?" : "Delete this video?")) return;
+    if (used) {
+      useEditor.getState().commit((d) => {
+        for (const s of d.scenes) s.elements = s.elements.filter((e) => !(e.type === "video" && e.src === ref));
+      });
+    }
+    await removeFile(name);
+  };
+
   const removeFile = async (name: string) => {
     try {
       await api.deleteAsset(project.id, name);
@@ -176,10 +195,10 @@ export function AssetsTab() {
         )}
       >
         {busy > 0 ? <Loader2 className="size-6 animate-spin text-aqua-ink" /> : <ImagePlus className="size-6 text-aqua-ink" />}
-        <span className="font-display text-[15px] font-semibold">{busy > 0 ? "Uploading…" : "Upload image or audio"}</span>
-        <span className="text-[11px] text-mute">Click or drop · PNG, JPEG, GIF, WebP (8 MB) · MP3, WAV, OGG (25 MB)</span>
+        <span className="font-display text-[15px] font-semibold">{busy > 0 ? "Uploading…" : "Upload image, audio or video"}</span>
+        <span className="text-[11px] text-mute">Click or drop · PNG, JPEG, GIF, WebP (8 MB) · MP3, WAV, OGG (25 MB) · MP4, WebM (100 MB)</span>
       </button>
-      <input ref={input} type="file" accept={ACCEPT} multiple hidden aria-label="Upload image or audio files"
+      <input ref={input} type="file" accept={ACCEPT} multiple hidden aria-label="Upload image, audio or video files"
         onChange={(e) => {
           if (e.target.files?.length) void upload(e.target.files);
           e.target.value = "";
@@ -201,6 +220,27 @@ export function AssetsTab() {
                 <img src={resolveAssetSrc(project.id, a.ref)} alt="" className="size-full object-cover" draggable={false} />
               </button>
               <IconButton label={`Delete image ${a.name}`} onClick={() => void remove(a.name, a.ref)}
+                className="absolute top-1 right-1 size-7 bg-ink/85 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:text-coral-ink">
+                <Trash2 className="size-3.5" />
+              </IconButton>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <ArcadeLabel className="mt-2 block text-mute">Video</ArcadeLabel>
+      {videos.length === 0 ? (
+        <p className="text-[11px] text-mute">No video clips yet. Upload an MP4 or WebM — click it to use it as the current scene&apos;s background.</p>
+      ) : (
+        <ul className="grid grid-cols-2 gap-3">
+          {videos.map((a, i) => (
+            <li key={a.name} className="group relative">
+              <button type="button" onClick={() => placeVideo(a)} aria-label={`Add video ${i + 1} to scene`}
+                className="px-box-flat relative block aspect-video w-full overflow-hidden bg-black transition-transform hover:-translate-y-0.5 hover:[--px-c:var(--color-aqua)]">
+                <video src={`${resolveAssetSrc(project.id, a.ref)}#t=0.5`} muted preload="metadata" className="size-full object-cover" />
+                <span className="absolute right-1 bottom-1 bg-ink/85 px-1 font-mono text-[9px] text-paper">{fmtTime(a.durationMs ?? 0)}</span>
+              </button>
+              <IconButton label={`Delete video ${a.name}`} onClick={() => void removeVideo(a.name, a.ref)}
                 className="absolute top-1 right-1 size-7 bg-ink/85 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:text-coral-ink">
                 <Trash2 className="size-3.5" />
               </IconButton>

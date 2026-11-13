@@ -109,13 +109,14 @@ Key design decisions:
 | Evaluation | Evaluation panel; per-export performance log; update history; benchmark script |
 | Audio | MP3/WAV/OGG upload (checked by content and fully decoded; 25 MB); per-scene narration with volume and start offset; background music with loop, fades and ducking under speech; waveforms on the timeline; synced preview playback; mixed into the export as AAC and verified |
 | Voice (VoiceStudio) | Generate a scene's voice-over from a script with any VoiceStudio voice and speed; clone a voice from a sample; optional voice description; fit the scene to the voice; word-timed captions from transcription; voice-overs read from a data scene's text are flagged out of date when that text changes |
+| Video clips | MP4/WebM upload (100 MB, checked with FFmpeg); video elements with fit, start offset, loop or hold; each frame is a pure function of scene time, so preview, thumbnails and export agree; export streams clips to the render browser through short-lived, project-scoped URLs |
+| Short-video generator | Dashboard → *Generate short*: a topic (script written by local Ollama) or your own script → one scene per sentence → VoiceStudio voice-over per scene → word-timed captions using the script's exact wording → Pexels stock clip per scene (orientation-matched, no repeats) → optional music with ducking → an ordinary, fully editable project. Follows MoneyPrinterTurbo's pipeline (MIT) re-implemented in TypeScript; missing engines degrade gracefully (silent video, plain backgrounds, keyword search terms) |
 | Narration writing (Ollama) | Optional "Write with AI" rewrites a scene's on-screen text as narration with a local model; output that introduces a number not on screen is rejected |
 | Interface | Original pixel-art ocean theme; light and dark modes; dashboard colours follow the time of day (dawn, day, sunset, night); WCAG AA contrast tested for every colour combination |
 
 **Not implemented:**
 
 - **LLM-written stories** — story wording on screen still uses deterministic templates. The optional Ollama writer only rephrases text a scene already shows, so statistics never depend on an LLM.
-- **Short-video generator** (topic → script → stock footage) — planned as the next phase.
 - **Selective video re-rendering** — every export renders all frames.
 - **User accounts** — out of scope for this prototype; all projects are local to the machine.
 - Cloud deployment, keyframe curves and real-time collaboration (out of scope).
@@ -154,9 +155,10 @@ Optional environment variables:
 | `FF_DATA_DIR` | Where projects, assets, datasets and exports are stored (default `./data`) |
 | `FF_VOICE_URL` | Voice engine (VoiceStudio's local API, or any server with the same OpenAI-style routes); default `http://127.0.0.1:3900` |
 | `FF_VOICE_API_KEY` | Only if the voice engine requires one (VoiceStudio needs none on localhost) |
-| `FF_OLLAMA_URL` / `FF_OLLAMA_MODEL` | Local narration writer; defaults `http://127.0.0.1:11434` and `llama3.2` |
+| `FF_OLLAMA_URL` / `FF_OLLAMA_MODEL` | Local script and narration writer; defaults `http://127.0.0.1:11434` and `llama3.2` |
+| `FF_PEXELS_API_KEY` | Stock footage for generated shorts (free at pexels.com/api); without it scenes use plain backgrounds |
 
-**Voice setup:** run VoiceStudio and install a speech model and a recognition model in Catalogue → Models; `curl http://localhost:3900/health` should answer `{"status":"ok",…}`. Without VoiceStudio or Ollama, `npx tsx scripts/mock-voice.ts` starts stand-ins on ports 3990 and 11499 (set `FF_VOICE_URL`/`FF_OLLAMA_URL` to match). The e2e tests `audio` and `voice` cover these features.
+**Voice setup:** run VoiceStudio and install a speech model and a recognition model in Catalogue → Models; `curl http://localhost:3900/health` should answer `{"status":"ok",…}`. Without VoiceStudio or Ollama, `npx tsx scripts/mock-voice.ts` starts stand-ins for VoiceStudio, Ollama and Pexels on ports 3990, 11499 and 3991 (set `FF_VOICE_URL`, `FF_OLLAMA_URL`, `FF_PEXELS_URL` and `FF_PEXELS_API_KEY=test-key` to match). The e2e tests `audio`, `voice` and `shorts` cover these features. Stock clips from Pexels are free to use; each clip's author is stored with the video element and shown in the inspector.
 
 ### Scripts
 

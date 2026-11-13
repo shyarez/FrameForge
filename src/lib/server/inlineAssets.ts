@@ -1,17 +1,23 @@
 import "server-only";
 import type { Project } from "@/lib/schema/project";
 import { readAsset } from "./assets";
+import { RENDER_MEDIA_PREFIX } from "./renderMedia";
 
 /**
- * Replace project-local image references ("asset:<name>") with data URLs read from the owner's
- * storage. The headless render browser then needs no session to load images, and can only ever
- * see images belonging to the project being exported.
+ * Make a project renderable by the headless browser, which has no user session:
+ * - images ("asset:<name>") become data URLs read from the owner's storage;
+ * - videos, too large to embed, point at short-lived render-media URLs under `mediaToken`.
+ * Either way the browser can only ever see files of the project being exported.
  */
-export async function inlineAssets(owner: string, project: Project): Promise<Project> {
+export async function inlineAssets(owner: string, project: Project, mediaToken?: string): Promise<Project> {
   const out: Project = structuredClone(project);
   const cache = new Map<string, string | null>();
   for (const scene of out.scenes) {
     for (const el of scene.elements) {
+      if (el.type === "video" && el.src.startsWith("asset:")) {
+        if (mediaToken) el.src = `${RENDER_MEDIA_PREFIX}${mediaToken}/${el.src.slice("asset:".length)}`;
+        continue;
+      }
       if (el.type !== "image" || !el.src.startsWith("asset:")) continue;
       const name = el.src.slice("asset:".length);
       if (!cache.has(name)) {

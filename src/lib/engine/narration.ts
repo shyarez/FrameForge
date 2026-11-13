@@ -74,6 +74,26 @@ function interpolateWords(seg: { start: number; end: number; text: string }): Ti
   });
 }
 
+/**
+ * Show the script's exact words with the engine's timings. Speech recognition can mishear or
+ * mis-spell words; when it heard the same number of words as the script, the script's spelling wins.
+ * Otherwise the transcript is used as heard.
+ */
+export function alignToScript(tr: Transcript, script: string): Transcript {
+  const scriptWords = script.split(/\s+/).filter(Boolean);
+  const timed = tr.words?.length ? tr.words : null;
+  if (timed && timed.length === scriptWords.length) {
+    return { ...tr, text: script, words: timed.map((w, i) => ({ ...w, word: scriptWords[i] })) };
+  }
+  if (!timed && tr.segments.length) {
+    // No word timings: spread the script over the span the engine says was spoken.
+    const start = tr.segments[0].start;
+    const end = tr.segments[tr.segments.length - 1].end;
+    if (end > start) return { text: script, segments: [{ start, end, text: script }] };
+  }
+  return tr;
+}
+
 /** Group words into short cues (a few words each), breaking at sentence ends and pauses. */
 export function captionCues(tr: Transcript): CaptionCue[] {
   const words = tr.words?.length ? tr.words : tr.segments.flatMap(interpolateWords);

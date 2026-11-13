@@ -46,3 +46,16 @@ export async function probeAudio(file: string): Promise<{ durationMs: number } |
   }
   return sec > 0 ? { durationMs: Math.round(sec * 1000) } : null;
 }
+
+/**
+ * Check a video file: it must have a video stream and its first frames must decode. Reports length and
+ * picture size. (Decoding a whole clip would be slow, so only the first second is decoded.)
+ */
+export async function probeVideoFile(file: string): Promise<{ durationMs: number; width: number; height: number } | null> {
+  const { code, err } = await runFfmpeg(["-hide_banner", "-v", "info", "-i", file, "-map", "0:v:0", "-t", "1", "-f", "null", "-"], { timeoutMs: 60_000 });
+  const stream = /Stream #0:\d+.*Video: \w+.*?, (\d{2,5})x(\d{2,5})/.exec(err);
+  const dur = /Duration: (\d+):(\d+):([\d.]+)/.exec(err);
+  if (code !== 0 || !stream || !dur) return null;
+  const sec = Number(dur[1]) * 3600 + Number(dur[2]) * 60 + Number(dur[3]);
+  return sec > 0 ? { durationMs: Math.round(sec * 1000), width: Number(stream[1]), height: Number(stream[2]) } : null;
+}

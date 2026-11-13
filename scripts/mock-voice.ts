@@ -130,7 +130,18 @@ export async function startMockOllama(port = 0, model = "llama3.2"): Promise<{ u
     const raw = await body(req);
     if (path === "/api/tags") return send(res, 200, { models: [{ name: `${model}:latest`, model: `${model}:latest` }] });
     if (path === "/api/generate" && req.method === "POST") {
-      const { prompt } = JSON.parse(raw.toString());
+      const { prompt, system, format } = JSON.parse(raw.toString());
+      if (format === "json") {
+        // Script planning: {"title", "scenes":[{text, search}]}; search terms: {"terms":[...]}.
+        if (/"scenes"/.test(String(system))) {
+          const topic = /Topic: (.*)/.exec(String(prompt))?.[1]?.trim() ?? "things";
+          const n = Number(/Number of scenes: (\d+)/.exec(String(prompt))?.[1] ?? 4);
+          const scenes = Array.from({ length: n }, (_, i) => ({ text: `Fact number ${i + 1} about ${topic} is surprising.`, search: i % 2 ? "ocean waves" : "city lights" }));
+          return send(res, 200, { model, response: JSON.stringify({ title: `All about ${topic}`, scenes }), done: true });
+        }
+        const lines = String(prompt).split("\n").filter(Boolean);
+        return send(res, 200, { model, response: JSON.stringify({ terms: lines.map((_, i) => (i % 2 ? "ocean waves" : "city lights")) }), done: true });
+      }
       const scene = /Scene text:\n([\s\S]*?)\n\n/.exec(String(prompt))?.[1] ?? "";
       // A prompt containing "INVENT" makes the mock add a number, to exercise the guard.
       const response = /INVENT/.test(scene) ? "Sales grew 999 percent." : `Here is the picture. ${scene}`;
@@ -143,10 +154,64 @@ export async function startMockOllama(port = 0, model = "llama3.2"): Promise<{ u
   return { url, close: () => new Promise((r) => server.close(() => r())) };
 }
 
+/**
+ * Pexels: /videos/search returns clips whose files are real MP4s served by this mock (one solid colour
+ * per clip, generated with FFmpeg at startup), so downloads, probing and rendering run for real.
+ */
+export async function startMockPexels(port = 0): Promise<{ url: string; searches: string[]; close(): Promise<void> }> {
+  const { spawnSync } = await import("node:child_process");
+  const { mkdtempSync, readFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const ffmpeg = (await import("ffmpeg-static")).default as unknown as string;
+  const dir = mkdtempSync(join(tmpdir(), "ff-mock-pexels-"));
+  const COLORS = ["red", "green", "blue", "yellow"];
+  const files = COLORS.map((c, i) => {
+    for (const [orient, size] of [["p", "540x960"], ["l", "960x540"]] as const) {
+      const out = join(dir, `${i}${orient}.mp4`);
+      spawnSync(ffmpeg, ["-y", "-loglevel", "error", "-f", "lavfi", "-i", `color=c=${c}:s=${size}:r=25:d=6`, "-c:v", "libx264", "-pix_fmt", "yuv420p", out]);
+    }
+    return { p: readFileSync(join(dir, `${i}p.mp4`)), l: readFileSync(join(dir, `${i}l.mp4`)) };
+  });
+  const searches: string[] = [];
+  let base = "";
+  const server = createServer(async (req, res) => {
+    const u = new URL(req.url ?? "/", "http://x");
+    if (u.pathname === "/videos/search") {
+      if (req.headers.authorization !== "test-key") return send(res, 401, { error: "Unauthorized" });
+      const q = u.searchParams.get("query") ?? "";
+      searches.push(q);
+      if (/nothing/.test(q)) return send(res, 200, { videos: [] });
+      const portrait = u.searchParams.get("orientation") === "portrait";
+      const videos = COLORS.map((c, i) => ({
+        id: 1000 + i,
+        duration: 6,
+        width: portrait ? 540 : 960,
+        height: portrait ? 960 : 540,
+        url: `https://www.pexels.com/video/${c}-${1000 + i}/`,
+        user: { name: `Mock ${c}`, url: "https://www.pexels.com/@mock" },
+        video_files: [{ link: `${base}/files/${i}${portrait ? "p" : "l"}.mp4`, width: portrait ? 540 : 960, height: portrait ? 960 : 540, file_type: "video/mp4", quality: "sd" }],
+      }));
+      return send(res, 200, { videos });
+    }
+    const m = /^\/files\/(\d)([pl])\.mp4$/.exec(u.pathname);
+    if (m) {
+      const buf = files[Number(m[1])][m[2] as "p" | "l"];
+      res.writeHead(200, { "content-type": "video/mp4", "content-length": String(buf.length) });
+      return res.end(buf);
+    }
+    send(res, 404, { error: "not found" });
+  });
+  await new Promise<void>((r) => server.listen(port, "127.0.0.1", r));
+  base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  return { url: base, searches, close: () => new Promise((r) => server.close(() => r())) };
+}
+
 if (process.argv[1] && /mock-voice\.ts$/.test(process.argv[1])) {
   void (async () => {
     const voice = await startMockVoice(Number(process.env.MOCK_VOICE_PORT ?? 3990));
     const ollama = await startMockOllama(Number(process.env.MOCK_OLLAMA_PORT ?? 11499));
-    console.log(`Mock VoiceStudio: ${voice.url}\nMock Ollama:      ${ollama.url}`);
+    const pexels = await startMockPexels(Number(process.env.MOCK_PEXELS_PORT ?? 3991));
+    console.log(`Mock VoiceStudio: ${voice.url}\nMock Ollama:      ${ollama.url}\nMock Pexels:      ${pexels.url} (API key "test-key")`);
   })();
 }

@@ -1,12 +1,12 @@
 "use client";
 
 import { create } from "zustand";
-import { createElement, createScene, newId } from "@/lib/schema/factory";
+import { createElement, createScene, newId, type BasicElementType } from "@/lib/schema/factory";
 import { sceneRestTime, sceneStartTimes } from "@/lib/engine/evaluate";
 import type { AssetInfo } from "@/lib/server/assets";
 import type { Story } from "@/lib/data/story";
 import type { DatasetRef, Music, Narration } from "@/lib/schema/project";
-import { projectDurationMs, type AspectRatio, type ElementType, type Project, type Scene, type SceneElement } from "@/lib/schema/project";
+import { projectDurationMs, type AspectRatio, type Project, type Scene, type SceneElement } from "@/lib/schema/project";
 
 /**
  * Editor state. History is a simple snapshot stack of the project document:
@@ -54,7 +54,9 @@ interface EditorState {
   deleteScene(id: string): void;
   moveScene(id: string, dir: -1 | 1): void;
   updateScene(id: string, patch: Partial<Omit<Scene, "id" | "elements">>): void;
-  addElement(type: ElementType, overrides?: Partial<SceneElement>): void;
+  addElement(type: BasicElementType, overrides?: Partial<SceneElement>): void;
+  /** Add a ready-made element (e.g. a video built with createVideo) to the selected scene. */
+  insertElement(el: SceneElement, at?: "back" | "front"): void;
   updateElement(id: string, patch: Partial<SceneElement>): void;
   deleteElement(id: string): void;
   reorderElement(id: string, dir: "forward" | "backward"): void;
@@ -267,7 +269,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       const copy = clone(src);
       copy.id = createScene().id;
       copy.name = `${src.name} copy`;
-      copy.elements = copy.elements.map((e) => ({ ...e, id: createElement(e.type, p.aspectRatio).id }));
+      copy.elements = copy.elements.map((e) => ({ ...e, id: newId("el") }));
       commit((d) => d.scenes.splice(d.scenes.findIndex((s) => s.id === id) + 1, 0, copy));
       get().selectScene(copy.id);
     },
@@ -299,6 +301,18 @@ export const useEditor = create<EditorState>()((set, get) => {
       if (!project || !selectedSceneId) return;
       const el = { ...createElement(type, project.aspectRatio), ...overrides } as SceneElement;
       commit((d) => findScene(d, selectedSceneId)?.elements.push(el));
+      set({ selectedElementId: el.id, playing: false });
+      seekRest();
+    },
+    insertElement(el, at = "front") {
+      const { selectedSceneId } = get();
+      if (!selectedSceneId) return;
+      commit((d) => {
+        const s = findScene(d, selectedSceneId);
+        if (!s) return;
+        if (at === "back") s.elements.unshift(el);
+        else s.elements.push(el);
+      });
       set({ selectedElementId: el.id, playing: false });
       seekRest();
     },

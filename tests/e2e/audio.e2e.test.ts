@@ -64,7 +64,7 @@ afterAll(async () => {
 describe("audio: narration and music", () => {
   it("uploads audio in the Assets tab", async () => {
     await page.getByRole("tab", { name: /Assets/ }).click();
-    await page.getByLabel("Upload image or audio files").setInputFiles([await tone("voice.wav", 2.2, 660), await tone("music.mp3", 3, 220)]);
+    await page.getByLabel("Upload image, audio or video files").setInputFiles([await tone("voice.wav", 2.2, 660), await tone("music.mp3", 3, 220)]);
     await expect.poll(async () => page.getByText(/^Audio \d$/).count(), { timeout: 30_000 }).toBe(2);
   });
 

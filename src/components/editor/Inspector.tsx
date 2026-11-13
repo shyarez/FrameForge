@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowDown, ArrowUp, BarChart3, Copy, Image as ImageIcon, Shapes, Trash2, Type } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, BarChart3, Copy, Film, Image as ImageIcon, Shapes, Trash2, Type } from "lucide-react";
 import { useState } from "react";
 import { useDraft } from "@/lib/client/useDraft";
 import { formatValue } from "@/lib/data/format";
@@ -12,6 +12,7 @@ import {
   type ImageElement,
   type Scene,
   type SceneElement,
+  type VideoElement,
 } from "@/lib/schema/project";
 import { Button, Field, IconButton, Select, TextInput, cx } from "@/components/ui/primitives";
 import type { AssetInfo } from "@/lib/server/assets";
@@ -124,8 +125,52 @@ function ChartDataEditor({ el, update }: { el: ChartElement; update: (p: Partial
   );
 }
 
+function VideoFields({ el, update }: { el: VideoElement; update: (p: Partial<SceneElement>) => void }) {
+  const videos = useEditor((s) => s.assets).filter((a) => a.media === "video" && a.durationMs);
+  const known = videos.some((a) => a.ref === el.src);
+  const set = (p: Partial<VideoElement>) => update(p as Partial<SceneElement>);
+  return (
+    <Section title="Video">
+      <Field label="Source" className="col-span-2">
+        <Select value={known ? el.src : ""} onChange={(e) => {
+          const a = videos.find((v) => v.ref === e.target.value);
+          if (a) set({ src: a.ref, durationMs: a.durationMs!, trimStartMs: 0 });
+        }}>
+          {!known && <option value="">Missing video</option>}
+          {videos.map((a, i) => (
+            <option key={a.name} value={a.ref}>
+              Video {i + 1} ({fmtTime(a.durationMs ?? 0)}{a.width ? `, ${a.width}×${a.height}` : ""})
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Fit">
+        <Select value={el.fit} onChange={(e) => set({ fit: e.target.value as VideoElement["fit"] })}>
+          <option value="cover">Cover</option>
+          <option value="contain">Contain</option>
+        </Select>
+      </Field>
+      <Field label="At the end">
+        <Select value={el.loop ? "loop" : "hold"} onChange={(e) => set({ loop: e.target.value === "loop" })}>
+          <option value="loop">Loop</option>
+          <option value="hold">Hold last frame</option>
+        </Select>
+      </Field>
+      <NumberField label="Start at (s)" value={el.trimStartMs / 1000} min={0} max={Math.max(0, el.durationMs / 1000 - 0.1)} step={0.1}
+        onCommit={(v) => set({ trimStartMs: Math.round(v * 1000) })} />
+      <NumberField label="Corner radius" value={el.radius} min={0} onCommit={(v) => set({ radius: v })} />
+      <p className="col-span-2 text-[11px] text-mute">{fmtTime(el.durationMs)} clip · its own sound is muted (use narration or music).</p>
+      {el.credit && (
+        <p className="col-span-2 text-[11px] text-mute">
+          Footage: <a href={el.credit.url} target="_blank" rel="noreferrer noopener" className="text-aqua-ink underline">{el.credit.author}</a> on {el.credit.provider}
+        </p>
+      )}
+    </Section>
+  );
+}
+
 function ImageFields({ el, update, styleUpdate }: { el: ImageElement; update: (p: Partial<SceneElement>) => void; styleUpdate: (p: Partial<SceneElement>) => void }) {
-  const assets = useEditor((s) => s.assets).filter((a) => a.media !== "audio");
+  const assets = useEditor((s) => s.assets).filter((a) => a.media === "image");
   const known = assets.some((a) => a.ref === el.src);
   return (
     <Section title="Image">
@@ -253,6 +298,7 @@ function ElementInspector({ el }: { el: SceneElement }) {
       <EvidenceSection el={el} />
 
       {el.type === "image" && <ImageFields el={el} update={update} styleUpdate={styleUpdate} />}
+      {el.type === "video" && <VideoFields el={el} update={update} />}
 
       {el.type === "chart" && (
         <Section title="Chart">
@@ -295,7 +341,7 @@ function ElementInspector({ el }: { el: SceneElement }) {
   );
 }
 
-const LAYER_ICON = { text: Type, shape: Shapes, image: ImageIcon, chart: BarChart3 } as const;
+const LAYER_ICON = { text: Type, shape: Shapes, image: ImageIcon, chart: BarChart3, video: Film } as const;
 
 /** Elements of the scene, topmost first. Lets you select elements that are hidden or covered on the canvas. */
 function LayersList({ scene }: { scene: Scene }) {
