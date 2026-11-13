@@ -60,7 +60,7 @@ describe("shorts: topic → editable short video", () => {
     const s = await (await api("/api/shorts/status")).json();
     expect(s.voice.connected).toBe(true);
     expect(s.writer.connected).toBe(true);
-    expect(s.pexels.configured).toBe(true);
+    expect(s.stock).toMatchObject({ configured: true, providers: ["Pexels", "Pixabay"] });
     expect(s.voices.map((v: { id: string }) => v.id)).toContain("nova");
   });
 
@@ -68,7 +68,7 @@ describe("shorts: topic → editable short video", () => {
     await page.goto(`${BASE}/`);
     await page.getByRole("button", { name: "Generate short" }).click();
     const dialog = page.getByRole("dialog", { name: "Generate a short video" });
-    await expect.poll(() => dialog.getByText(/Pexels$/).count(), { timeout: 15_000 }).toBe(1);
+    await expect.poll(() => dialog.getByText(/Stock footage: Pexels, Pixabay$/).count(), { timeout: 15_000 }).toBe(1);
     await dialog.getByLabel("Topic").fill("deep sea creatures");
     await dialog.getByLabel("Length").selectOption("4");
     await dialog.locator("select").filter({ has: page.getByRole("option", { name: "Nova" }) }).selectOption("nova");
@@ -136,5 +136,32 @@ describe("shorts: topic → editable short video", () => {
     const body = await res.json();
     expect(res.status, JSON.stringify(body)).toBe(201);
     expect(Math.abs(body.asset.durationMs - 70_000)).toBeLessThan(200);
+  });
+
+  it("generates from my own script and my own clips through the dialog", async () => {
+    // Two "own" clips: solid magenta and cyan, which the stock mock never serves.
+    const own = ["magenta", "cyan"].map((c) => {
+      const f = path.join(tmp, `${c}.mp4`);
+      spawnSync(ffmpegPath(), ["-y", "-v", "error", "-f", "lavfi", "-i", `color=c=${c}:s=540x960:r=25:d=4`, "-c:v", "libx264", "-pix_fmt", "yuv420p", f]);
+      return f;
+    });
+    await page.goto(`${BASE}/`);
+    await page.getByRole("button", { name: "Generate short" }).click();
+    const dialog = page.getByRole("dialog", { name: "Generate a short video" });
+    await dialog.getByRole("tab", { name: "My own script" }).click();
+    await dialog.getByLabel("Script").fill("Rivers carve the land over time. Water always finds a way forward.");
+    await dialog.getByLabel("Footage").selectOption("mine");
+    await dialog.getByLabel("Your video clips").setInputFiles(own);
+    await dialog.getByRole("button", { name: "Generate video" }).click();
+    await page.waitForURL((u) => /\/editor\/prj_/.test(u.toString()) && !u.toString().endsWith(projectId), { timeout: 90_000 });
+    const ownId = /\/editor\/(prj_[A-Za-z0-9_-]+)/.exec(page.url())![1];
+    try {
+      const p: Project = (await (await api(`/api/projects/${ownId}`)).json()).project;
+      expect(p.scenes).toHaveLength(2);
+      const vids = p.scenes.map((s) => s.elements.find((e) => e.type === "video") as { credit?: unknown } | undefined);
+      expect(vids.every((v) => v && !v.credit)).toBe(true);
+    } finally {
+      await api(`/api/projects/${ownId}`, { method: "DELETE" });
+    }
   });
 });
