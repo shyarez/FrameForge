@@ -10,6 +10,7 @@ import type {
   SceneElement,
   ShapeElement,
   TextElement,
+  VideoElement,
 } from "./project";
 import { CANVAS_SIZES, SCHEMA_VERSION } from "./project";
 
@@ -85,6 +86,23 @@ export function createImage(src: string, partial: Partial<ImageElement> = {}): I
   };
 }
 
+/** A video filling the canvas by default (stock footage background). */
+export function createVideo(src: string, durationMs: number, aspect: AspectRatio, partial: Partial<VideoElement> = {}): VideoElement {
+  const { width, height } = CANVAS_SIZES[aspect];
+  return {
+    ...base("Video", 0, 0, width, height),
+    type: "video",
+    src,
+    fit: "cover",
+    radius: 0,
+    durationMs,
+    trimStartMs: 0,
+    loop: true,
+    enter: anim("none", 0, 0),
+    ...partial,
+  };
+}
+
 export function createChart(partial: Partial<ChartElement> = {}): ChartElement {
   return {
     ...base("Chart", 260, 240, 1400, 640),
@@ -104,7 +122,10 @@ export function createChart(partial: Partial<ChartElement> = {}): ChartElement {
   };
 }
 
-export function createElement(type: ElementType, aspect: AspectRatio): SceneElement {
+/** Elements that can be created from nothing (video needs a file, see createVideo). */
+export type BasicElementType = Exclude<ElementType, "video">;
+
+export function createElement(type: BasicElementType, aspect: AspectRatio): SceneElement {
   const { width, height } = CANVAS_SIZES[aspect];
   const center = (w: number, h: number) => ({ x: Math.round((width - w) / 2), y: Math.round((height - h) / 2) });
   switch (type) {

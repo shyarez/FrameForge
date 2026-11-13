@@ -23,10 +23,31 @@ declare global {
 
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
+/** Resolve once a video has finished seeking and has the current frame decoded (or after a timeout). */
+function videoReady(v: HTMLVideoElement, timeoutMs = 20_000): Promise<void> {
+  if (v.error || (!v.seeking && v.readyState >= 2)) return Promise.resolve();
+  return new Promise((resolve) => {
+    const done = () => {
+      if (!v.error && (v.seeking || v.readyState < 2)) return;
+      clearTimeout(timer);
+      for (const e of ["seeked", "loadeddata", "canplay", "error"]) v.removeEventListener(e, done);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      for (const e of ["seeked", "loadeddata", "canplay", "error"]) v.removeEventListener(e, done);
+      resolve();
+    }, timeoutMs);
+    for (const e of ["seeked", "loadeddata", "canplay", "error"]) v.addEventListener(e, done);
+  });
+}
+
 async function settle() {
   await document.fonts.ready;
   const imgs = Array.from(document.images);
   await Promise.all(imgs.map((img) => (img.complete ? Promise.resolve() : img.decode().catch(() => undefined))));
+  const videos = Array.from(document.querySelectorAll<HTMLVideoElement>("video[data-ff-video]"));
+  // Seeks start in a layout effect during the flushSync commit, so a pending seek is visible here.
+  await Promise.all(videos.map((v) => videoReady(v)));
   await nextFrame();
   await nextFrame();
 }

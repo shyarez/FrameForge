@@ -15,6 +15,7 @@ const STATUS_LABEL: Record<ExportJob["status"], string> = {
   launching: "Starting headless renderer…",
   rendering: "Rendering frames",
   encoding: "Encoding H.264 video…",
+  mixing: "Mixing narration and music…",
   verifying: "Verifying the MP4 decodes cleanly…",
   done: "Export complete",
   error: "Export failed",
@@ -127,7 +128,8 @@ export function ExportDialog({ open, onClose, save }: { open: boolean; onClose: 
                     </motion.div>
                     <video key={job.id} src={api.exportFileUrl(job.id)} controls className="px-box-flat mt-4 w-full bg-black" />
                     <p className="mt-2 font-mono text-[11px] text-mute">
-                      Verified: {job.probe.codec} {job.probe.width}×{job.probe.height} @ {job.probe.fps}fps, {job.probe.durationSec.toFixed(2)}s, decoded without errors
+                      Verified: {job.probe.codec} {job.probe.width}×{job.probe.height} @ {job.probe.fps}fps, {job.probe.durationSec.toFixed(2)}s
+                      {job.probe.audio ? `, ${job.probe.audio.codec} ${job.probe.audio.channels} audio` : ", no audio"}, decoded without errors
                     </p>
                   </>
                 )}

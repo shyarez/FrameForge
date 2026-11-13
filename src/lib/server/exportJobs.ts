@@ -1,15 +1,21 @@
 import "server-only";
 import { promises as fs } from "node:fs";
 import { nanoid } from "nanoid";
+import { audioPlan, hasAudio } from "@/lib/engine/audio";
 import type { Project } from "@/lib/schema/project";
+import { assetPath } from "./assets";
 import { probeVideo, renderProjectToMp4, type ProbeResult } from "./render";
+import { inlineAssets } from "./inlineAssets";
+import { grantRenderMedia, revokeRenderMedia } from "./renderMedia";
 import { appendExportMetric } from "./metrics";
 import { exportFile } from "./storage";
 
-export type ExportStatus = "queued" | "launching" | "rendering" | "encoding" | "verifying" | "done" | "error";
+export type ExportStatus = "queued" | "launching" | "rendering" | "encoding" | "mixing" | "verifying" | "done" | "error";
 
 export interface ExportJob {
   id: string;
+  /** The user who started the export; only they can see its status or download it. */
+  ownerId: string;
   projectId: string;
   projectName: string;
   status: ExportStatus;
@@ -27,9 +33,10 @@ const g = globalThis as unknown as { __ffJobs?: Map<string, ExportJob>; __ffQueu
 const jobs = (g.__ffJobs ??= new Map());
 
 /** Exports run one at a time: each owns a Chromium instance and an FFmpeg process. */
-export function startExport(project: Project, origin: string): ExportJob {
+export function startExport(owner: string, project: Project, origin: string): ExportJob {
   const job: ExportJob = {
     id: `exp_${nanoid(12)}`,
+    ownerId: owner,
     projectId: project.id,
     projectName: project.name,
     status: "queued",
@@ -41,12 +48,23 @@ export function startExport(project: Project, origin: string): ExportJob {
 
   const run = async () => {
     job.startedAt = Date.now();
+    // Lets the render browser stream this project's videos for the duration of the export only.
+    const mediaToken = grantRenderMedia(owner, project.id);
     try {
-      const out = exportFile(job.id);
+      const out = exportFile(owner, job.id);
+      // Images are embedded and videos get short-lived URLs, so the render browser never needs the user's session.
+      const renderable = await inlineAssets(owner, project, mediaToken);
+      // Audio is read straight from the owner's asset folder by FFmpeg; the browser never sees it.
+      const plan = audioPlan(project);
+      const files: Record<string, string> = {};
+      for (const src of [...plan.narration.map((c) => c.src), ...(plan.music ? [plan.music.src] : [])]) {
+        files[src] = assetPath(owner, project.id, src.slice("asset:".length));
+      }
       await renderProjectToMp4({
-        project,
+        project: renderable,
         origin,
         outFile: out,
+        audio: { plan, files },
         onProgress: (p) => {
           job.status = p.phase;
           job.frame = p.frame;
@@ -57,11 +75,12 @@ export function startExport(project: Project, origin: string): ExportJob {
       job.status = "verifying";
       job.probe = await probeVideo(out);
       if (!job.probe.decodedOk) throw new Error("Output failed decode verification");
+      if (hasAudio(plan) && !job.probe.audio) throw new Error("Output is missing its audio track");
       job.status = "done";
       // Record measured performance for the evaluation panel; a metrics failure never fails the export.
       const renderSec = (renderedAt - job.startedAt) / 1000;
       const bytes = (await fs.stat(out).catch(() => null))?.size ?? 0;
-      await appendExportMetric(project.id, {
+      await appendExportMetric(owner, project.id, {
         jobId: job.id,
         at: new Date().toISOString(),
         width: job.probe.width,
@@ -78,6 +97,7 @@ export function startExport(project: Project, origin: string): ExportJob {
       job.status = "error";
       job.error = err instanceof Error ? err.message : String(err);
     } finally {
+      revokeRenderMedia(mediaToken);
       job.finishedAt = Date.now();
     }
   };
@@ -85,4 +105,8 @@ export function startExport(project: Project, origin: string): ExportJob {
   return job;
 }
 
-export const getJob = (id: string) => jobs.get(id);
+/** A job, only if it belongs to this user (anything else is reported as not found). */
+export const getJob = (owner: string, id: string): ExportJob | undefined => {
+  const job = jobs.get(id);
+  return job && job.ownerId === owner ? job : undefined;
+};

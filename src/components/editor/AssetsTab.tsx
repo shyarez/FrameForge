@@ -1,15 +1,79 @@
 "use client";
 
-import { ImagePlus, Loader2, Trash2 } from "lucide-react";
-import { useRef, useState, type DragEvent } from "react";
+import { ImagePlus, Loader2, Mic, Music2, Pause, Play, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 import { api } from "@/lib/client/api";
+import { createVideo } from "@/lib/schema/factory";
 import { CANVAS_SIZES } from "@/lib/schema/project";
+import type { AssetInfo } from "@/lib/server/assets";
+import { fmtTime } from "./Timeline";
 import { resolveAssetSrc } from "@/components/render/SceneView";
 import { Sprite } from "@/components/pixel/Sprite";
 import { ArcadeLabel, IconButton, cx } from "@/components/ui/primitives";
 import { useEditor } from "@/store/editor";
 
-const ACCEPT = "image/png,image/jpeg,image/gif,image/webp";
+const ACCEPT = "image/png,image/jpeg,image/gif,image/webp,audio/mpeg,audio/wav,audio/x-wav,audio/ogg,.mp3,.wav,.ogg,video/mp4,video/webm,.mp4,.webm";
+
+/** Default music settings when a track is first chosen. */
+export const DEFAULT_MUSIC = { volume: 0.35, loop: true, fadeInMs: 1000, fadeOutMs: 1500, duck: 0.3 };
+
+/** One audio file: listen, use as this scene's narration, or as the background music. */
+function AudioRow({ a, index, onRemove }: { a: AssetInfo; index: number; onRemove: () => void }) {
+  const project = useEditor((s) => s.project)!;
+  const selectedSceneId = useEditor((s) => s.selectedSceneId);
+  const { setNarration, setMusic } = useEditor.getState();
+  const [playing, setPlaying] = useState(false);
+  const el = useRef<HTMLAudioElement | null>(null);
+  const toggle = () => {
+    if (!el.current) {
+      el.current = new Audio(resolveAssetSrc(project.id, a.ref));
+      el.current.onended = () => setPlaying(false);
+    }
+    if (playing) {
+      el.current.pause();
+      setPlaying(false);
+    } else {
+      el.current.currentTime = 0;
+      void el.current.play().then(() => setPlaying(true), () => setPlaying(false));
+    }
+  };
+  useEffect(() => () => el.current?.pause(), []);
+  const isMusic = project.music?.src === a.ref;
+  const narratedScenes = project.scenes.filter((s) => s.narration?.src === a.ref).length;
+  const durationMs = a.durationMs ?? 0;
+  return (
+    <li className="px-box-flat bg-ink p-2.5">
+      <div className="flex items-center gap-2">
+        <IconButton label={playing ? `Stop audio ${index + 1}` : `Listen to audio ${index + 1}`} onClick={toggle} className="size-7 shrink-0">
+          {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+        </IconButton>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium">Audio {index + 1}</span>
+          <span className="block font-mono text-[10px] text-mute">
+            {a.kind.toUpperCase()} · {durationMs ? fmtTime(durationMs) : "?"}
+            {isMusic && " · music"}
+            {narratedScenes > 0 && ` · ${narratedScenes} scene${narratedScenes === 1 ? "" : "s"}`}
+          </span>
+        </span>
+        <IconButton label={`Delete audio ${a.name}`} onClick={onRemove} className="size-7 shrink-0 hover:text-coral-ink">
+          <Trash2 className="size-3.5" />
+        </IconButton>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-1.5">
+        <button type="button" disabled={!selectedSceneId || !durationMs}
+          onClick={() => selectedSceneId && setNarration(selectedSceneId, { src: a.ref, durationMs, volume: 1, offsetMs: 0 })}
+          className="px-box-flat flex items-center justify-center gap-1 bg-panel py-1 text-[11px] hover:[--px-c:var(--color-aqua)] disabled:opacity-50">
+          <Mic className="size-3" /> Narrate scene
+        </button>
+        <button type="button" disabled={!durationMs}
+          onClick={() => setMusic(isMusic ? undefined : { ...DEFAULT_MUSIC, ...project.music, src: a.ref, durationMs })}
+          className="px-box-flat flex items-center justify-center gap-1 bg-panel py-1 text-[11px] hover:[--px-c:var(--color-aqua)] disabled:opacity-50">
+          <Music2 className="size-3" /> {isMusic ? "Remove music" : "Use as music"}
+        </button>
+      </div>
+    </li>
+  );
+}
 
 /** Natural pixel size of an image URL. */
 function naturalSize(src: string): Promise<{ w: number; h: number }> {
@@ -23,8 +87,11 @@ function naturalSize(src: string): Promise<{ w: number; h: number }> {
 
 export function AssetsTab() {
   const project = useEditor((s) => s.project)!;
-  const assets = useEditor((s) => s.assets);
-  const { setAssets, addElement } = useEditor.getState();
+  const allAssets = useEditor((s) => s.assets);
+  const assets = allAssets.filter((a) => a.media === "image");
+  const audio = allAssets.filter((a) => a.media === "audio");
+  const videos = allAssets.filter((a) => a.media === "video");
+  const { setAssets, addElement, insertElement } = useEditor.getState();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +130,39 @@ export function AssetsTab() {
   const remove = async (name: string, ref: string) => {
     const used = project.scenes.some((s) => s.elements.some((e) => e.type === "image" && e.src === ref));
     if (!confirm(used ? "This image is used in your scenes. Delete it anyway? Those elements will show a placeholder." : "Delete this image?")) return;
+    await removeFile(name);
+  };
+
+  const removeAudio = async (name: string, ref: string) => {
+    const used = project.music?.src === ref || project.scenes.some((s) => s.narration?.src === ref);
+    if (!confirm(used ? "This audio is used in your project. Delete it and remove it from the timeline?" : "Delete this audio?")) return;
+    if (used) {
+      useEditor.getState().commit((d) => {
+        if (d.music?.src === ref) delete d.music;
+        for (const s of d.scenes) if (s.narration?.src === ref) delete s.narration;
+      });
+    }
+    await removeFile(name);
+  };
+
+  /** A clip becomes a full-canvas background at the back of the scene. */
+  const placeVideo = (a: AssetInfo) => {
+    if (!a.durationMs) return;
+    insertElement(createVideo(a.ref, a.durationMs, project.aspectRatio, { name: "Video" }), "back");
+  };
+
+  const removeVideo = async (name: string, ref: string) => {
+    const used = project.scenes.some((s) => s.elements.some((e) => e.type === "video" && e.src === ref));
+    if (!confirm(used ? "This video is used in your scenes. Delete it and remove it from those scenes?" : "Delete this video?")) return;
+    if (used) {
+      useEditor.getState().commit((d) => {
+        for (const s of d.scenes) s.elements = s.elements.filter((e) => !(e.type === "video" && e.src === ref));
+      });
+    }
+    await removeFile(name);
+  };
+
+  const removeFile = async (name: string) => {
     try {
       await api.deleteAsset(project.id, name);
       setAssets(useEditor.getState().assets.filter((a) => a.name !== name));
@@ -79,7 +179,7 @@ export function AssetsTab() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <ArcadeLabel className="block text-mute">Project images</ArcadeLabel>
+      <ArcadeLabel className="block text-mute">Project assets</ArcadeLabel>
       <button
         type="button"
         onClick={() => input.current?.click()}
@@ -95,10 +195,10 @@ export function AssetsTab() {
         )}
       >
         {busy > 0 ? <Loader2 className="size-6 animate-spin text-aqua-ink" /> : <ImagePlus className="size-6 text-aqua-ink" />}
-        <span className="font-display text-[15px] font-semibold">{busy > 0 ? "Uploading…" : "Upload image"}</span>
-        <span className="text-[11px] text-mute">Click or drop · PNG, JPEG, GIF, WebP · max 8 MB</span>
+        <span className="font-display text-[15px] font-semibold">{busy > 0 ? "Uploading…" : "Upload image, audio or video"}</span>
+        <span className="text-[11px] text-mute">Click or drop · PNG, JPEG, GIF, WebP (8 MB) · MP3, WAV, OGG (25 MB) · MP4, WebM (100 MB)</span>
       </button>
-      <input ref={input} type="file" accept={ACCEPT} multiple hidden aria-label="Upload image files"
+      <input ref={input} type="file" accept={ACCEPT} multiple hidden aria-label="Upload image, audio or video files"
         onChange={(e) => {
           if (e.target.files?.length) void upload(e.target.files);
           e.target.value = "";
@@ -124,6 +224,38 @@ export function AssetsTab() {
                 <Trash2 className="size-3.5" />
               </IconButton>
             </li>
+          ))}
+        </ul>
+      )}
+
+      <ArcadeLabel className="mt-2 block text-mute">Video</ArcadeLabel>
+      {videos.length === 0 ? (
+        <p className="text-[11px] text-mute">No video clips yet. Upload an MP4 or WebM — click it to use it as the current scene&apos;s background.</p>
+      ) : (
+        <ul className="grid grid-cols-2 gap-3">
+          {videos.map((a, i) => (
+            <li key={a.name} className="group relative">
+              <button type="button" onClick={() => placeVideo(a)} aria-label={`Add video ${i + 1} to scene`}
+                className="px-box-flat relative block aspect-video w-full overflow-hidden bg-black transition-transform hover:-translate-y-0.5 hover:[--px-c:var(--color-aqua)]">
+                <video src={`${resolveAssetSrc(project.id, a.ref)}#t=0.5`} muted preload="metadata" className="size-full object-cover" />
+                <span className="absolute right-1 bottom-1 bg-ink/85 px-1 font-mono text-[9px] text-paper">{fmtTime(a.durationMs ?? 0)}</span>
+              </button>
+              <IconButton label={`Delete video ${a.name}`} onClick={() => void removeVideo(a.name, a.ref)}
+                className="absolute top-1 right-1 size-7 bg-ink/85 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:text-coral-ink">
+                <Trash2 className="size-3.5" />
+              </IconButton>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <ArcadeLabel className="mt-2 block text-mute">Audio</ArcadeLabel>
+      {audio.length === 0 ? (
+        <p className="text-[11px] text-mute">No audio yet. Upload a voice-over or a music track, then use it as a scene&apos;s narration or as background music.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {audio.map((a, i) => (
+            <AudioRow key={a.name} a={a} index={i} onRemove={() => void removeAudio(a.name, a.ref)} />
           ))}
         </ul>
       )}
