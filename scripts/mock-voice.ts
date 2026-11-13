@@ -194,6 +194,25 @@ export async function startMockPexels(port = 0): Promise<{ url: string; searches
       }));
       return send(res, 200, { videos });
     }
+    // Pixabay's video API on the same mock (point FF_PIXABAY_URL here). Clips come in reverse colour order.
+    if (u.pathname === "/api/videos/" || u.pathname === "/api/videos") {
+      if (u.searchParams.get("key") !== "test-key") return send(res, 400, { error: "[ERROR 400] Invalid or missing API key" });
+      const q = u.searchParams.get("q") ?? "";
+      searches.push(`pixabay:${q}`);
+      if (/nothing/.test(q)) return send(res, 200, { total: 0, totalHits: 0, hits: [] });
+      const hits = [...COLORS.keys()].reverse().flatMap((i) =>
+        (["p", "l"] as const).map((o) => ({
+          id: 2000 + i * 2 + (o === "p" ? 0 : 1),
+          pageURL: `https://pixabay.com/videos/${COLORS[i]}-${2000 + i}/`,
+          duration: 6,
+          user: `pix_${COLORS[i]}`,
+          videos: {
+            small: { url: `${base}/files/${i}${o}.mp4`, width: o === "p" ? 540 : 960, height: o === "p" ? 960 : 540, size: files[i][o].length },
+          },
+        })),
+      );
+      return send(res, 200, { total: hits.length, totalHits: hits.length, hits });
+    }
     const m = /^\/files\/(\d)([pl])\.mp4$/.exec(u.pathname);
     if (m) {
       const buf = files[Number(m[1])][m[2] as "p" | "l"];
@@ -212,6 +231,6 @@ if (process.argv[1] && /mock-voice\.ts$/.test(process.argv[1])) {
     const voice = await startMockVoice(Number(process.env.MOCK_VOICE_PORT ?? 3990));
     const ollama = await startMockOllama(Number(process.env.MOCK_OLLAMA_PORT ?? 11499));
     const pexels = await startMockPexels(Number(process.env.MOCK_PEXELS_PORT ?? 3991));
-    console.log(`Mock VoiceStudio: ${voice.url}\nMock Ollama:      ${ollama.url}\nMock Pexels:      ${pexels.url} (API key "test-key")`);
+    console.log(`Mock VoiceStudio: ${voice.url}\nMock Ollama:      ${ollama.url}\nMock Pexels + Pixabay: ${pexels.url} (API key "test-key")`);
   })();
 }
