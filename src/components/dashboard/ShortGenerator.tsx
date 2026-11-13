@@ -9,7 +9,8 @@ import type { Voice, VoiceStatus } from "@/lib/server/voice";
 import type { WriterStatus } from "@/lib/server/writer";
 import { ArcadeLabel, Button, Field, PixelProgress, Select, TextInput, cx } from "@/components/ui/primitives";
 
-type Status = { voice: VoiceStatus; voices: Voice[]; writer: WriterStatus; pexels: { configured: boolean } };
+type Status = { voice: VoiceStatus; voices: Voice[]; writer: WriterStatus; stock: { configured: boolean; providers: string[] } };
+type Footage = "stock" | "mine" | "none";
 
 const LENGTHS = [
   { scenes: 4, label: "About 15 seconds (4 scenes)" },
@@ -65,7 +66,8 @@ export function ShortGenerator({ onDone }: { onDone: (projectId: string) => void
   const [voice, setVoice] = useState("default");
   const [speed, setSpeed] = useState(1);
   const [captions, setCaptions] = useState(true);
-  const [footage, setFootage] = useState(true);
+  const [footage, setFootage] = useState<Footage>("stock");
+  const [clips, setClips] = useState<File[]>([]);
   const [music, setMusic] = useState<File | null>(null);
   const [job, setJob] = useState<ShortJob | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +84,10 @@ export function ShortGenerator({ onDone }: { onDone: (projectId: string) => void
 
   const voiceOk = status?.voice.connected ?? false;
   const writerOk = status?.writer.connected && status.writer.modelInstalled !== false;
-  const canStart = mode === "topic" ? topic.trim().length > 2 && writerOk : script.trim().length > 2;
+  const stockOk = Boolean(status?.stock.configured);
+  // Without a stock key, "stock" quietly means plain backgrounds; show that honestly in the picker.
+  const footageMode: Footage = footage === "stock" && status && !stockOk ? "none" : footage;
+  const canStart = (mode === "topic" ? topic.trim().length > 2 && writerOk : script.trim().length > 2) && (footageMode !== "mine" || clips.length > 0);
 
   const start = async () => {
     setError(null);
@@ -96,9 +101,10 @@ export function ShortGenerator({ onDone }: { onDone: (projectId: string) => void
           voice: voiceOk ? voice : null,
           speed,
           captions,
-          footage: footage && Boolean(status?.pexels.configured),
+          footage: footageMode,
         },
         music,
+        footageMode === "mine" ? clips : [],
       );
       setJob(job);
       timer.current = setInterval(async () => {
@@ -151,8 +157,8 @@ export function ShortGenerator({ onDone }: { onDone: (projectId: string) => void
             <Check2 ok={status ? voiceOk : undefined}>
               Voice: {status ? (voiceOk ? `VoiceStudio${status.voice.version ? ` ${status.voice.version}` : ""}` : "VoiceStudio not running — the video will be silent") : "checking…"}
             </Check2>
-            <Check2 ok={status ? status.pexels.configured : undefined}>
-              Stock footage: {status ? (status.pexels.configured ? "Pexels" : "no Pexels key (set FF_PEXELS_API_KEY) — plain backgrounds") : "checking…"}
+            <Check2 ok={status ? stockOk : undefined}>
+              Stock footage: {status ? (stockOk ? status.stock.providers.join(", ") : "no key (set FF_PIXABAY_API_KEY) — use your own clips or plain backgrounds") : "checking…"}
             </Check2>
           </>
         )}
@@ -217,12 +223,25 @@ export function ShortGenerator({ onDone }: { onDone: (projectId: string) => void
             className="h-8 text-[11px] text-mute file:mr-2 file:h-8 file:border-0 file:bg-raised file:px-2 file:text-paper" />
         </Field>
       </div>
-      <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
-        <label className="flex items-center gap-2"><input type="checkbox" checked={captions} onChange={(e) => setCaptions(e.target.checked)} /> Captions</label>
-        <label className={cx("flex items-center gap-2", !status?.pexels.configured && "text-mute")}>
-          <input type="checkbox" checked={footage && Boolean(status?.pexels.configured)} disabled={!status?.pexels.configured} onChange={(e) => setFootage(e.target.checked)} /> Stock footage
-        </label>
-      </div>
+      <Field label="Footage">
+        <Select value={footageMode} onChange={(e) => setFootage(e.target.value as Footage)}>
+          <option value="stock" disabled={!stockOk}>Stock clips{stockOk ? ` (${status!.stock.providers.join(", ")})` : " — needs an API key"}</option>
+          <option value="mine">My own clips</option>
+          <option value="none">None (plain backgrounds)</option>
+        </Select>
+      </Field>
+      {footageMode === "mine" && (
+        <Field label={`Your clips, in scene order${clips.length ? ` (${clips.length})` : ""}`}>
+          <input type="file" multiple accept="video/mp4,video/webm,.mp4,.webm" aria-label="Your video clips"
+            onChange={(e) => setClips(Array.from(e.target.files ?? []).slice(0, 12))}
+            className="h-8 text-[11px] text-mute file:mr-2 file:h-8 file:border-0 file:bg-raised file:px-2 file:text-paper" />
+          <span className="text-[11px] text-mute">
+            MP4 or WebM, up to 12 clips, 100 MB each. Clip 1 goes in scene 1, and so on.
+            {stockOk ? " Extra scenes get stock clips." : " If there are more scenes than clips, your clips are reused."}
+          </span>
+        </Field>
+      )}
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={captions} onChange={(e) => setCaptions(e.target.checked)} /> Captions</label>
       {error && <p className="text-xs break-words text-coral-ink" role="alert">{error}</p>}
       <Button variant="primary" type="submit" disabled={!canStart || !status} className="mt-1 h-11">
         <Sparkles className="size-4" /> Generate video
