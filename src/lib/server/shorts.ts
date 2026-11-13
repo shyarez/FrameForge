@@ -6,8 +6,8 @@ import { createProject, createScene, createShape, createVideo, PALETTE } from "@
 import { CANVAS_SIZES, type AspectRatio, type Music, type Project, type Scene } from "@/lib/schema/project";
 import { readAsset, saveAsset, type AssetInfo } from "./assets";
 import { deleteProject, saveProject } from "./storage";
-import { downloadClip, pexelsConfigured, searchStock, type Orientation, type StockClip } from "./stock";
-import { speak, transcribe, VoiceError } from "./voice";
+import { downloadClip, matchesOrientation, PROVIDER_NAMES, searchStock, stockProviders, stockFailure, type Orientation } from "./stock";
+import { resolveNarrator, speak, transcribe, VoiceError } from "./voice";
 import { planShort, searchTerms } from "./writer";
 
 /**
@@ -31,7 +31,10 @@ export interface ShortRequest {
   voice: string | null;
   speed: number;
   captions: boolean;
-  footage: boolean;
+  /** "stock": Pixabay/Pexels clips; "mine": the uploaded clips in order (stock fills any extra scenes); "none": plain backgrounds. */
+  footage: "stock" | "mine" | "none";
+  /** The user's own clips for footage "mine", in scene order. */
+  myClips?: Uint8Array[];
   music?: Uint8Array;
 }
 
@@ -48,6 +51,7 @@ export interface ShortJob {
   projectId?: string;
   title?: string;
   warnings: string[];
+  footageDiagnostics?: string[];
   error?: string;
   createdAt: number;
   finishedAt?: number;
@@ -78,6 +82,8 @@ const BACKGROUNDS = [PALETTE.ink, PALETTE.night, "#1b1440", "#2a0f2e", "#0c2f24"
 
 export const DEFAULT_SHORT_MUSIC: Omit<Music, "src" | "durationMs"> = { volume: 0.25, loop: true, fadeInMs: 800, fadeOutMs: 1500, duck: 0.35 };
 
+type StockCredit = { provider: string; author: string; url: string };
+
 const orientationOf = (a: AspectRatio): Orientation => (a === "9:16" ? "portrait" : a === "16:9" ? "landscape" : "square");
 
 export function startShort(owner: string, req: ShortRequest): ShortJob {
@@ -103,6 +109,8 @@ async function runShort(owner: string, req: ShortRequest, job: ShortJob) {
   const step = (key: StepKey) => job.steps.find((s) => s.key === key)!;
   const begin = (key: StepKey, detail?: string) => Object.assign(step(key), { state: "running", detail });
   const finish = (key: StepKey, state: StepState = "done", detail?: string) => Object.assign(step(key), { state, ...(detail !== undefined ? { detail } : {}) });
+  const warn = (message: string) => { if (!job.warnings.includes(message)) job.warnings.push(message); };
+  const diagnose = (message: string) => { (job.footageDiagnostics ??= []).push(message); };
   const weights: Record<StepKey, number> = { script: 0.15, voice: 0.35, captions: 0.15, footage: 0.3, music: 0.02, assemble: 0.03 };
   const progressAt = (key: StepKey, frac: number) => {
     let acc = 0;
@@ -125,7 +133,7 @@ async function runShort(owner: string, req: ShortRequest, job: ShortJob) {
       const texts = splitScript(req.script);
       if (!texts.length) throw new VoiceError("The script is empty", 400);
       let terms: string[] = [];
-      if (req.footage) {
+      if (req.footage !== "none") {
         terms = await searchTerms(texts).catch(() => {
           job.warnings.push("Ollama is not available, so footage search terms were taken from the script's keywords.");
           return [];
@@ -154,11 +162,13 @@ async function runShort(owner: string, req: ShortRequest, job: ShortJob) {
 
     // 2. Voice-over, one take per scene.
     const voices: (AssetInfo | null)[] = [];
+    let narrator: string | null = null;
     if (req.voice !== null) {
       begin("voice");
+      narrator = await resolveNarrator(req.voice);
       for (let i = 0; i < lines.length; i++) {
         step("voice").detail = `Scene ${i + 1} of ${lines.length}`;
-        const audio = await speak({ text: lines[i].text, voice: req.voice, speed: req.speed, language: req.language });
+        const audio = await speak({ text: lines[i].text, voice: narrator, speed: req.speed, language: req.language });
         voices.push(await saveAsset(owner, projectId, audio));
         progressAt("voice", (i + 1) / lines.length);
       }
@@ -200,40 +210,86 @@ async function runShort(owner: string, req: ShortRequest, job: ShortJob) {
       finish("captions", "skipped");
     }
 
-    // 4. Stock footage.
-    const clips: ({ asset: AssetInfo; clip: StockClip } | null)[] = lines.map(() => null);
-    if (req.footage && pexelsConfigured()) {
+    // 4. Footage: the user's own clips first (in order), stock footage for the rest.
+    const clips: ({ asset: AssetInfo; credit?: StockCredit; trimStartMs: number } | null)[] = lines.map(() => null);
+    const stockReady = stockProviders().length > 0;
+    if (req.footage !== "none") {
       begin("footage");
+      const own: AssetInfo[] = [];
+      if (req.footage === "mine") {
+        for (const [k, bytes] of (req.myClips ?? []).entries()) {
+          step("footage").detail = `Your clip ${k + 1}`;
+          const a = await saveAsset(owner, projectId, bytes);
+          if (a.media !== "video" || !a.durationMs) throw new VoiceError(`Clip ${k + 1} is not a video`, 415);
+          own.push(a);
+        }
+        if (!own.length) throw new VoiceError("Add at least one video clip, or choose stock footage", 400);
+      }
       const used = new Set<string>();
       const minShortEdge = project.exportSettings.resolution;
       let missing = 0;
+      let stockUsed = 0;
       for (let i = 0; i < lines.length; i++) {
-        step("footage").detail = `“${lines[i].search}”`;
-        const queries = [...new Set([lines[i].search, keywordTerms(lines[i].text), keywordTerms(title)])].filter(Boolean);
-        let picked: StockClip | null = null;
-        for (const q of queries) {
-          const found = await searchStock(q, { orientation: orientationOf(req.aspectRatio), minDurationMs: Math.min(durations[i], 6000), minShortEdge }).catch((e) => {
-            if (e instanceof VoiceError && (e.status === 502 || e.status === 429)) throw e; // bad key or rate limit: stop
-            return [] as StockClip[];
-          });
-          picked = found.find((c) => !used.has(c.id)) ?? null;
-          if (picked) break;
+        if (i < own.length) {
+          clips[i] = { asset: own[i], trimStartMs: 0 };
+          continue;
         }
-        if (picked) {
-          used.add(picked.id);
-          const asset = await saveAsset(owner, projectId, await downloadClip(picked.fileUrl)).catch(() => null);
-          if (asset?.media === "video") clips[i] = { asset, clip: picked };
-          else missing++;
-        } else {
-          missing++;
+        if (stockReady) {
+          step("footage").detail = `“${lines[i].search}”`;
+          const queries = [...new Set([lines[i].search, keywordTerms(lines[i].text), keywordTerms(title)])].filter(Boolean);
+          for (const q of queries) {
+            const found = await searchStock(q, { orientation: orientationOf(req.aspectRatio), minDurationMs: Math.min(durations[i], 6000), minShortEdge, onDiagnostic: (m) => {
+              diagnose(`Scene ${i + 1}: ${m}`);
+              if (m.includes("search:")) warn(m);
+            } }).catch((e) => {
+              warn(`Scene ${i + 1} stock search: ${stockFailure(e)}.`);
+              if (e instanceof VoiceError && (e.status === 502 || e.status === 429)) throw e; // bad key or rate limit: stop
+              return [];
+            });
+            for (const picked of found.filter((c) => !used.has(c.id))) {
+              let bytes: Uint8Array;
+              try {
+                bytes = await downloadClip(picked.fileUrl);
+              } catch (e) {
+                warn(`Scene ${i + 1} ${PROVIDER_NAMES[picked.provider]} download: ${stockFailure(e)}.`);
+                continue;
+              }
+              try {
+                const asset = await saveAsset(owner, projectId, bytes);
+                if (asset.media !== "video" || !asset.durationMs) throw new Error("Not a video");
+                clips[i] = { asset, trimStartMs: 0, credit: { provider: PROVIDER_NAMES[picked.provider], author: picked.author, url: picked.pageUrl } };
+                used.add(picked.id);
+                stockUsed++;
+                diagnose(`Scene ${i + 1}: selected ${picked.id}; validated video ${asset.width}x${asset.height}, ${asset.durationMs} ms.`);
+                if (!matchesOrientation(picked.width, picked.height, orientationOf(req.aspectRatio))) warn(`Scene ${i + 1}: stock footage is cropped to fill ${req.aspectRatio} because matching footage was unavailable.`);
+                break;
+              } catch {
+                warn(`Scene ${i + 1} ${PROVIDER_NAMES[picked.provider]} asset validation failed: clip could not be stored as a decodable video.`);
+              }
+            }
+            if (clips[i]) break;
+          }
         }
+        if (!clips[i] && own.length) {
+          // Out of stock options: reuse the user's clips, starting further in so repeats look different.
+          const a = own[i % own.length];
+          const round = Math.floor(i / own.length);
+          clips[i] = { asset: a, trimStartMs: Math.max(0, Math.floor(((round * a.durationMs!) / 3) % Math.max(1, a.durationMs! - 1000))) };
+        }
+        if (!clips[i]) missing++;
         progressAt("footage", (i + 1) / lines.length);
       }
-      finish("footage", "done", missing ? `${lines.length - missing} of ${lines.length} scenes` : `${lines.length} clips`);
-      if (missing) job.warnings.push(`No suitable footage was found for ${missing} scene${missing === 1 ? "" : "s"}; they use a plain background.`);
+      const parts = [own.length ? `${Math.min(own.length, lines.length)} yours` : "", stockUsed ? `${stockUsed} stock` : ""].filter(Boolean).join(", ");
+      finish("footage", "done", parts || undefined);
+      if (missing) {
+        job.warnings.push(
+          stockReady
+            ? `No suitable footage was found for ${missing} scene${missing === 1 ? "" : "s"}; they use a plain background.`
+            : "Stock footage was skipped: set FF_PIXABAY_API_KEY (free at pixabay.com/api/docs) or upload your own clips.",
+        );
+      }
     } else {
-      finish("footage", "skipped", req.footage ? "No Pexels API key" : undefined);
-      if (req.footage) job.warnings.push("Stock footage was skipped: set FF_PEXELS_API_KEY (free at pexels.com/api).");
+      finish("footage", "skipped");
     }
 
     // 5. Music.
@@ -260,7 +316,8 @@ async function runShort(owner: string, req: ShortRequest, job: ShortJob) {
         scene.elements.push(
           createVideo(c.asset.ref, c.asset.durationMs!, req.aspectRatio, {
             name: "Footage",
-            credit: { provider: "Pexels", author: c.clip.author, url: c.clip.pageUrl },
+            trimStartMs: c.trimStartMs,
+            ...(c.credit ? { credit: c.credit } : {}),
           }),
           // Dims the footage so white captions stay readable.
           createShape({ name: "Shade", x: 0, y: 0, width: canvas.width, height: canvas.height, radius: 0, fill: "#000000", opacity: 0.3, enter: { preset: "none", delayMs: 0, durationMs: 0, easing: "linear" } }),
@@ -273,7 +330,7 @@ async function runShort(owner: string, req: ShortRequest, job: ShortJob) {
           durationMs: v.durationMs,
           volume: 1,
           offsetMs: 0,
-          script: { text: line.text, voice: req.voice ?? "default", speed: req.speed },
+          script: { text: line.text, voice: narrator ?? "default", speed: req.speed },
         };
       }
       if (cues[i]?.length) scene.elements.push(...captionElements(cues[i], scene, req.aspectRatio));
@@ -284,13 +341,13 @@ async function runShort(owner: string, req: ShortRequest, job: ShortJob) {
     job.progress = 1;
     job.status = "done";
   } catch (err) {
-    job.status = "error";
     job.error = err instanceof Error ? err.message : String(err);
     const running = job.steps.find((s) => s.state === "running");
     if (running) running.state = "error";
     // Don't leave a half-built project behind.
     if (project) await deleteProject(owner, project.id).catch(() => undefined);
     job.projectId = undefined;
+    job.status = "error";
   } finally {
     job.finishedAt = Date.now();
   }
