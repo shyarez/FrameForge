@@ -117,11 +117,12 @@ export const api = {
   writeNarration: (projectId: string, text: string, style?: string) =>
     postJson(`/api/projects/${encodeURIComponent(projectId)}/voice/write`, { text, style }).then((r) => json<{ text: string }>(r)),
   shortsStatus: () =>
-    fetch("/api/shorts/status", { cache: "no-store" }).then((r) => json<{ voice: VoiceStatus; voices: Voice[]; writer: WriterStatus; pexels: { configured: boolean } }>(r)),
-  startShort: (options: Record<string, unknown>, music?: File | null) => {
+    fetch("/api/shorts/status", { cache: "no-store" }).then((r) => json<{ voice: VoiceStatus; voices: Voice[]; writer: WriterStatus; stock: { configured: boolean; providers: string[] } }>(r)),
+  startShort: (options: Record<string, unknown>, music?: File | null, clips: File[] = []) => {
     const form = new FormData();
     form.append("options", JSON.stringify(options));
     if (music) form.append("music", music);
+    for (const c of clips) form.append("clips", c);
     return fetch("/api/shorts", { method: "POST", body: form }).then((r) => json<{ job: ShortJob }>(r));
   },
   getShort: (jobId: string) => fetch(`/api/shorts/${encodeURIComponent(jobId)}`, { cache: "no-store" }).then((r) => json<{ job: ShortJob }>(r)),
