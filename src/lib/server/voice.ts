@@ -112,6 +112,28 @@ export async function listVoices(): Promise<Voice[]> {
   return all;
 }
 
+/** Resolve once per Auto Mode job. VoiceStudio's OpenAI aliases do not identify a speaker. */
+export async function resolveNarrator(selected: string): Promise<string> {
+  const catalog = await call("/v1/audio/voices").then((r) => r.json());
+  const profilesBody = await call("/profiles").then((r) => r.json());
+  const profiles = parseVoices(profilesBody, "profile");
+  // An exact profile id wins, matching VoiceStudio's own resolution rules.
+  const exact = profiles.find((p) => p.id === selected);
+  if (exact) return exact.id;
+  const key = selected.trim().toLowerCase();
+  const entries = Array.isArray(catalog) ? catalog : catalog.voices ?? catalog.data ?? [];
+  const aliases = entries.filter((v: { type?: string }) => v?.type === "openai_alias");
+  const isAlias = aliases.some((v: { id?: string; voice_id?: string }) => (v.id ?? v.voice_id)?.toLowerCase() === key);
+  if (isAlias || (key === "default" && aliases.length > 0)) {
+    const demo = profiles.find((p) => p.id === "demo0001");
+    if (!demo) throw new VoiceError("A fixed narrator is required: the Demo Voice profile is unavailable. Select an existing voice profile.", 422);
+    return demo.id;
+  }
+  const named = profiles.filter((p) => p.name.trim().toLowerCase() === key);
+  if (named.length > 1) throw new VoiceError("Several voice profiles have this name. Select a profile by its id.", 422);
+  return named[0]?.id ?? selected;
+}
+
 export interface SpeakRequest {
   text: string;
   voice: string;
