@@ -17,13 +17,30 @@ FrameForge brings together two primary workflows:
 
 Rather than treating videos solely as finished media files, FrameForge represents them as structured compositions that can be edited, previewed, and rendered.
 
+## Current working status
+
+Status reviewed on **13 November 2026**, against the current working tree, including in-progress changes.
+
+FrameForge is a substantial local prototype: it already supports useful manual video editing, evidence-linked data stories, project persistence, and real MP4 exports. Its strongest workflows are **editing existing scenes** and **turning CSV data into editable, traceable visual stories**. Auto Mode adds script writing, speech, captions, and stock footage, but it is still experimental and is not yet dependable as a one-click video generator on a CPU-only laptop.
+
+| Workflow | Current position |
+|---|---|
+| Manual video editing | Implemented: arrange elements, edit scenes, animate, preview, save, and export. |
+| Data storytelling | Implemented: import CSV data, generate evidence-linked scenes, review dataset changes, and selectively update content. |
+| Local accounts | Implemented: registration, login/logout, hashed passwords, sessions, and per-user project storage. |
+| Topic-to-script writing | Verified with local Ollama and `qwen3:1.7b`; response time depends on the machine and model. |
+| Stock footage | Real Pixabay footage has been verified in the editor preview and exported MP4. Subject relevance is not yet validated. |
+| Narration and Auto Mode | Integration exists, but the current Demo Voice reference path timed out during real CPU synthesis. Consistent multi-scene narration is not yet verified in real generation. |
+
+No defensible overall completion percentage is available. The core editor is usable, while reliable automation, narrator consistency, footage relevance, and generation speed still need work.
+
 ## Key Features
 
 - **Visual Editor:** Interactive canvas for arranging and customizing text, images, shapes, and charts, with snapping guides, in-place text editing, duplicate/copy/paste, layers and undo/redo.
 - **Scene-Based Timeline:** Organize video scenes, drag to set durations, reorder, and configure animations and transitions.
 - **Editable Compositions:** Modify generated content instead of being restricted to fixed templates.
 - **Data-Driven Storytelling:** Import a CSV and generate a 3–5 scene animated story (intro, key metric, comparison, trend or distribution, summary) — only the scenes the data supports.
-- **Evidence-Aware Analytics:** Every generated number is produced by a stored, deterministic calculation linked to the exact dataset version and the scenes that show it.
+- **Evidence-Aware Analytics:** Numerical claims in generated data stories come from stored, deterministic calculations linked to the exact dataset version and the scenes that show them. This evidence guarantee does not extend to Ollama-written topic scripts.
 - **Evidence-Aware Updates:** Upload a new version of a dataset and only the affected claims and scenes are refreshed, with a before/after review; manual styling and unrelated scenes are preserved.
 - **Video Preview and Export:** Preview in the browser and export real H.264 MP4 files (720p/1080p, 24/30 fps, 16:9, 9:16 or 1:1), each verified by a full decode.
 - **Evaluation:** An in-editor panel that re-runs every claim against its stored data and measures evidence coverage, update selectivity and export speed.
@@ -88,17 +105,18 @@ Users can create scenes manually or use the data-storytelling features to genera
 Key design decisions:
 
 - **One versioned scene document**, validated with Zod on every read and write.
-- **One pure animation evaluator**, `evaluateProject(project, timeMs)`, renders both the browser preview and every exported frame, so preview and video match frame for frame.
+- **One pure animation evaluator**, `evaluateProject(project, timeMs)`, supplies animation state to both the browser preview and every exported frame. Media loading and real-time playback still depend on browser behavior.
 - **MP4 export** follows the HyperFrames capture pattern (seekable page → per-frame screenshot → FFmpeg) with FrameForge's own seek contract: headless Chrome is driven by Playwright and frames are encoded by FFmpeg. No HyperFrames code is copied.
 - **All statistics are deterministic JavaScript**, computed on the server from the stored CSV version. Narrative text is a template whose numbers come only from evidence, so no number is invented.
 
 ## Feature status
 
-**Implemented and tested** (unit tests plus browser end-to-end tests that drive the real UI):
+The following capabilities are implemented, with unit and browser end-to-end coverage across the main workflows. Coverage does not mean every external service or hardware configuration is reliable; see the current limitations below.
 
 | Area | Features |
 |---|---|
 | Projects | Dashboard (create from template, list with hover previews, delete), autosave and Ctrl+S, reload persistence |
+| Accounts | Sign up, sign in, sign out, server-side sessions, password hashing, and user-isolated local project storage; optional development-only login shortcut |
 | Editing | Text, shapes, images, charts; drag, resize, snapping guides (Alt disables); in-place text editing; duplicate, copy/paste; layers list; undo/redo; keyboard shortcuts |
 | Scenes and animation | Add, delete, duplicate, reorder scenes; drag scene duration; fade / slide / scale / pop presets with easing; enter and exit animations; fade and slide transitions |
 | Assets | Image upload (type checked by file content; PNG, JPEG, GIF, WebP; SVG rejected; 8 MB limit) and an Assets tab |
@@ -108,18 +126,23 @@ Key design decisions:
 | Evidence-aware updates | Dataset versioning (identical uploads detected); update review with before/after comparison; selective refresh; stale scenes; apply as one undo step; Evidence Inspector with canvas highlighting |
 | Evaluation | Evaluation panel; per-export performance log; update history; benchmark script |
 | Audio | MP3/WAV/OGG upload (checked by content and fully decoded; 25 MB); per-scene narration with volume and start offset; background music with loop, fades and ducking under speech; waveforms on the timeline; synced preview playback; mixed into the export as AAC and verified |
-| Voice (VoiceStudio) | Generate a scene's voice-over from a script with any VoiceStudio voice and speed; clone a voice from a sample; optional voice description; fit the scene to the voice; word-timed captions from transcription; voice-overs read from a data scene's text are flagged out of date when that text changes |
+| Voice (VoiceStudio) | Text-to-speech integration, voice selection, existing voice-cloning controls, optional voice description, scene fitting, transcription, and caption creation. The current Auto Mode narrator-resolution change uses the Demo Voice profile for default/OpenAI-style aliases and preserves existing profile selections. Mock tests pass, but real CPU reference synthesis timed out; this path is not yet a verified working fix. |
 | Video clips | MP4/WebM upload (100 MB, checked with FFmpeg); video elements with fit, start offset, loop or hold; each frame is a pure function of scene time, so preview, thumbnails and export agree; export streams clips to the render browser through short-lived, project-scoped URLs |
-| Short-video generator | Dashboard → *Generate short*: a topic (script written by local Ollama) or your own script → one scene per sentence → VoiceStudio voice-over per scene → word-timed captions using the script's exact wording → footage per scene: your own uploaded clips in order, and/or Pixabay or Pexels stock clips (orientation-matched, no repeats, credited) → optional music with ducking → an ordinary, fully editable project. Follows MoneyPrinterTurbo's pipeline (MIT) re-implemented in TypeScript; missing engines degrade gracefully (silent video, plain backgrounds, keyword search terms) |
+| Short-video generator | A topic or your own script becomes an editable scene project, with optional speech, captions, uploaded clips, Pixabay/Pexels footage, and music. Matching orientations are preferred; validated clips can be cropped to fill the canvas. Stock credits and sanitized search/download diagnostics are retained. Speech synthesis can fail a job, and footage relevance remains unresolved. The pipeline follows MoneyPrinterTurbo's approach, re-implemented in TypeScript. |
 | Narration writing (Ollama) | Optional "Write with AI" rewrites a scene's on-screen text as narration with a local model; output that introduces a number not on screen is rejected |
 | Interface | Original pixel-art ocean theme; light and dark modes; dashboard colours follow the time of day (dawn, day, sunset, night); WCAG AA contrast tested for every colour combination |
 
-**Not implemented:**
+### Current limitations and unfinished work
 
-- **LLM-written stories** — story wording on screen still uses deterministic templates. The optional Ollama writer only rephrases text a scene already shows, so statistics never depend on an LLM.
+- **CPU narration reliability:** the latest real reference-voice test exceeded the existing five-minute synthesis timeout on its first scene. Mock tests verify profile routing, not audible speaker consistency. No lightweight-engine replacement has been installed or integrated as a fix.
+- **Footage relevance:** selection checks duration, orientation/renditions, and trusted download hosts, but does not validate whether the footage depicts the narration's subject. Broad fallback queries can produce unrelated clips. Plain backgrounds are supported, but unrelated footage is not yet consistently rejected.
+- **Speed controls:** the scene voice-panel selector sets synthesis speed for the next generation request; it does not change existing audio immediately. The requested `0.5× / 1× / 1.5× / 2×` replacement and its end-to-end verification have not been implemented.
+- **Caption synchronization after edits:** caption wording/timing can fall back to transcription or estimates. Existing caption elements are not automatically rebuilt after changes to narration offsets or scene length; manual re-timing is available.
+- **Generation latency:** speech, transcription, and footage processing run largely scene by scene. No representative nine-scene before/after performance improvement has been verified.
+- **LLM-written analytical stories:** CSV story wording remains deterministic. Ollama can write topic-based short scripts or rewrite scene narration, but the evidence calculations do not depend on it.
+- **Stock images:** automatic stock retrieval currently supports video clips only. Image elements and manual image uploads are supported separately.
 - **Selective video re-rendering** — every export renders all frames.
-- **User accounts** — out of scope for this prototype; all projects are local to the machine.
-- Cloud deployment, keyframe curves and real-time collaboration (out of scope).
+- **Production infrastructure:** cloud storage/deployment, durable background job queues, keyframe curves, and real-time collaboration are not implemented. Storage remains local to the host machine.
 
 ## Technology
 
@@ -144,7 +167,16 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. Try the **Data** tab → *Try the synthetic sample* to generate a data story in under a minute.
+Open http://localhost:3000, create an account or sign in, and create a project. In the editor, try the **Data** tab → *Try the synthetic sample* for the data-story workflow. Manual editing and data stories do not require Ollama or VoiceStudio.
+
+For topic-based scripts with the model verified on the current development machine, add these server-side settings to `.env.local`:
+
+```env
+FF_OLLAMA_URL=http://localhost:11434
+FF_OLLAMA_MODEL=qwen3:1.7b
+```
+
+The integration's fallback model remains `llama3.2` when `FF_OLLAMA_MODEL` is unset. Configure the exact installed model rather than assuming that a running Ollama server alone enables topic generation. Restart the development server if it does not pick up environment changes.
 
 Optional environment variables:
 
@@ -157,9 +189,12 @@ Optional environment variables:
 | `FF_VOICE_API_KEY` | Only if the voice engine requires one (VoiceStudio needs none on localhost) |
 | `FF_OLLAMA_URL` / `FF_OLLAMA_MODEL` | Local script and narration writer; defaults `http://127.0.0.1:11434` and `llama3.2` |
 | `FF_PIXABAY_API_KEY` | Stock footage for generated shorts (free; shown on pixabay.com/api/docs when logged in) |
-| `FF_PEXELS_API_KEY` | Alternative stock source (Pexels has paused new keys). Without any stock key, use your own clips or plain backgrounds |
+| `FF_PEXELS_API_KEY` | Alternative stock source. Without any stock key, use your own clips or plain backgrounds |
+| `FF_DEV_LOGIN` | Set to `1` to enable the localhost-only developer login shortcut outside production |
 
-**Voice setup:** run VoiceStudio and install a speech model and a recognition model in Catalogue → Models; `curl http://localhost:3900/health` should answer `{"status":"ok",…}`. Without VoiceStudio or Ollama, `npx tsx scripts/mock-voice.ts` starts stand-ins for VoiceStudio, Ollama, Pexels and Pixabay on ports 3990, 11499 and 3991 (set `FF_VOICE_URL`, `FF_OLLAMA_URL`, `FF_PEXELS_URL`/`FF_PIXABAY_URL` and the stock keys to `test-key` to match). The e2e tests `audio`, `voice` and `shorts` cover these features. Pixabay and Pexels clips are free to use; each clip's author is stored with the video element and shown in the inspector.
+**Voice setup and limits:** VoiceStudio runs separately; its health endpoint is `http://localhost:3900/health`. A healthy server or a ready-model status does not establish acceptable CPU synthesis speed. The current Demo Voice reference path has failed live verification as described above; do not treat it as a completed narrator-consistency fix.
+
+**Mock services:** `npx tsx scripts/mock-voice.ts` starts stand-ins for VoiceStudio, Ollama, Pexels and Pixabay on ports 3990, 11499 and 3991. Point `FF_VOICE_URL`, `FF_OLLAMA_URL`, and `FF_PEXELS_URL`/`FF_PIXABAY_URL` at those services, use stock key `test-key`, and set `FF_OLLAMA_MODEL=llama3.2` for the default mock writer. The mock voice produces tones, not realistic speech: it is useful for timing and API tests, not for judging speaker identity or speech quality. Stock attribution is stored on video elements and shown in the inspector.
 
 ### Scripts
 
@@ -174,19 +209,19 @@ Optional environment variables:
 
 ## Evaluation
 
-Measured with `npm run eval` on seeded synthetic data (full results in [docs/EVALUATION.md](docs/EVALUATION.md)):
+The recorded `npm run eval` benchmark from **29 October 2026** uses seeded synthetic data (full results in [docs/EVALUATION.md](docs/EVALUATION.md)):
 
-- **Speed:** a 50,000-row CSV is parsed in about 90 ms, profiled in about 150 ms, and turned into a full story in about 35 ms.
+- **Speed:** a 50,000-row CSV was parsed in about 70 ms, profiled in about 136 ms, and turned into a full story in about 37 ms.
 - **Selectivity:** editing one cell in a 10,000-row dataset refreshed 1 of 27 elements; doubling one region refreshed 9 of 27; removing a column marked 2 scenes stale instead of guessing.
 - **Correctness:** in every scenario, every updated claim matched a fresh analysis of the new data, manual work was preserved, and every stored claim reproduced exactly from its recorded dataset version.
 
-Timings differ between machines. The in-editor **Evaluate** panel reports the same checks for any saved project, plus measured export speed.
+These are historical data-processing measurements, not Auto Mode generation or MP4 export timings. Timings differ between machines. The in-editor **Evaluate** panel reports evidence checks and recorded export speed for saved projects.
 
 ## Project structure
 
 ```text
 src/
-  app/                 Pages (dashboard, editor, render target) and API route handlers
+  app/                 Dashboard, auth, editor, render target, and API route handlers
   components/
     dashboard/         Dashboard, ocean time-of-day colours
     editor/            Canvas, timeline, inspector, dialogs (export, data story, update, evaluation)
@@ -196,11 +231,11 @@ src/
     engine/            Pure animation evaluator, snapping
     data/              CSV parsing, profiling, statistics, story generation, bindings, update engine, audit
     schema/            Versioned scene document (Zod) and factories
-    server/            Storage, assets, datasets, export jobs, rendering, metrics
+    server/            Auth, storage, assets, datasets, voice, script writing, stock footage, jobs, rendering, metrics
   store/               Editor state (Zustand)
 tests/
   unit/                Vitest unit tests
-  e2e/                 Browser end-to-end tests (Days 1–4)
+  e2e/                 Editor/data/audio/voice/shorts tests and opt-in live Pixabay verification
 scripts/eval.ts        Evaluation benchmark
 docs/                  Progress log and evaluation results
 public/samples/        Synthetic sample dataset
@@ -218,9 +253,24 @@ FrameForge aims to:
 
 ## Project Status
 
-FrameForge Studio is an academic software project (B.Tech CSE minor project). The full workflow works end to end: create a project → edit animated scenes → import a CSV → generate an editable data story → update the dataset → refresh only the affected scenes → export an MP4.
+FrameForge Studio is an academic software project (B.Tech CSE minor project) with a functioning editing and data-storytelling foundation. Implemented workflows include creating projects, editing animated scenes, generating and updating evidence-linked CSV stories, and exporting MP4 files. Auto Mode is an additional integration workflow whose reliability still depends on external services and the unresolved issues above.
 
-The test suite has 138 unit tests and 26 browser end-to-end tests. The day-by-day build log, including bugs found and fixed, is in [docs/PROGRESS.md](docs/PROGRESS.md).
+The latest focused narration/shorts/audio regression run passed **56 tests**; TypeScript and targeted ESLint checks also passed. This was not a fresh run of the entire test suite. Real Pixabay footage was separately verified in preview and MP4 output with voice disabled, and real Qwen topic-to-script generation succeeded. Real Demo Voice synthesis timed out, so neither that test nor mock coverage establishes a working CPU narration pipeline.
+
+[docs/PROGRESS.md](docs/PROGRESS.md) records earlier milestones and their historical test totals. Its early storage paths and unfinished-feature lists reflect those milestones, not the complete current working tree.
+
+## Potential for improvement
+
+The structured project document, shared renderer, and evidence system provide a useful foundation for a more reliable video-creation tool. The next improvements should build on that foundation:
+
+1. **Reliable CPU narration:** use a verified fixed-speaker path with predictable synthesis time, while keeping deliberate voice choices explicit.
+2. **Relevant visual storytelling:** validate scene subjects and topic relevance, reject unsuitable footage, and make plain-background fallback dependable.
+3. **Clear timing controls:** explain when speech must be regenerated and keep narration, captions, and scene duration synchronized after edits.
+4. **Measured performance work:** profile real multi-scene projects, then optimize demonstrated bottlenecks without lowering default output quality or overloading the laptop.
+5. **More capable editing and export:** explore finer audio control, reusable scene assets, and selective rendering after the current workflows are stable.
+6. **Deployment and collaboration:** consider durable storage, recoverable jobs, and shared editing as later extensions.
+
+These are development opportunities, not completed features or promised speedups. The project's potential is in combining editable video, transparent data claims, and local automation; its immediate priority is making the existing automation dependable.
 
 ## Credits
 
